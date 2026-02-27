@@ -125,7 +125,10 @@ export default function RegisterPage() {
       <Navbar />
       <div className="mx-auto w-full max-w-md p-4 md:p-8">
         <div className="section-shell p-6 shadow-2xl md:p-8">
-          <p className="font-display text-xl font-bold text-blue-500 md:text-2xl">InternVue</p>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="InternVue Logo" className="h-10 w-auto" />
+            <p className="font-display text-xl font-bold text-blue-500 md:text-2xl">InternVue</p>
+          </div>
           <h1 className="mt-2 font-display text-2xl font-semibold text-slate-900 dark:text-white md:text-3xl">Create your account</h1>
 
           {socialError ? (

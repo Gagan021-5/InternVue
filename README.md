@@ -4,7 +4,8 @@
   <img src="https://raw.githubusercontent.com/tandpfun/skill-icons/main/icons/ExpressJS-Dark.svg" alt="Express" width="60" />
   <img src="https://raw.githubusercontent.com/tandpfun/skill-icons/main/icons/MongoDB.svg" alt="MongoDB" width="60" />
   <img src="https://raw.githubusercontent.com/tandpfun/skill-icons/main/icons/TailwindCSS-Dark.svg" alt="Tailwind" width="60" />
-
+  <br />
+  <img src="./frontend/public/logo.png" alt="InternVue Logo" width="120" />
   <h1 align="center">InternVue</h1>
 
   <p align="center">
@@ -39,6 +40,7 @@
 - 🔐 **Robust Authentication:** Secure JWT-based email/password registration alongside Social OAuth (Google, GitHub) handled via Firebase and synced to MongoDB.
 - ⚡ **Real-Time Job Aggregation:** Integrates with the Adzuna API / RapidAPI to fetch, map, and organize thousands of global internship opportunities.
 - 🧠 **AI-Powered "Mentor":** Employs Google's Gemini AI to analyze raw job descriptions and instantly generate custom, targeted interview prep questions.
+- ✨ **AI Cover Letter & Outreach:** Instantly generates highly professional, personalized cold outreach emails tailored to the student's profile and the specific job description using Gemini 2.5 Flash.
 - 📊 **Kanban Pipeline Tracker:** A beautifully interactive, drag-and-drop Kanban board enabling students to track application statuses (`Saved`, `Applied`, `Interviewing`, `Accepted`).
 - 📍 **Location-Aware Filtering:** Browser Geolocation API integration automatically detects city/state for hyper-local internship results.
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion"; // Highly Recommended
+import { AnimatePresence, motion } from "framer-motion";
 import Navbar from "../components/Navbar";
 import FilterPanel from "../components/FilterPanel";
 import InternshipCard from "../components/InternshipCard";
@@ -16,8 +16,15 @@ const JOB_CATEGORIES = [
   "Frontend",
   "Backend",
   "Web3",
-  "Design"
+  "Design",
 ];
+
+const categoryTermsMap = {
+  "Full-Stack (MERN)": ["full-stack", "full stack", "mern", "react", "node", "express", "mongodb"],
+  "AI/ML (Numpy/Pandas)": ["ai", "ml", "machine learning", "artificial intelligence", "numpy", "pandas", "data science"],
+  Frontend: ["frontend", "front-end", "react", "vue", "angular", "ui"],
+  Backend: ["backend", "back-end", "node", "express", "django", "spring", "api"],
+};
 
 export default function FeedPage() {
   const [location, setLocation] = useState("");
@@ -26,6 +33,7 @@ export default function FeedPage() {
   const [page, setPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState("All");
   const pageSize = 20;
+
   const [filters, setFilters] = useState({
     sources: { local: true, adzuna: true },
     verifiedOnly: false,
@@ -36,15 +44,14 @@ export default function FeedPage() {
   const { isAuthenticated } = useAuthContext();
   const [savedIds, setSavedIds] = useState(new Set());
 
-  // PERSISTENT DATA LOADING
   useEffect(() => {
     const loadSaved = async () => {
       if (!isAuthenticated) return;
       try {
         const response = await axiosInstance.get("/api/user/jobs");
         setSavedIds(new Set((response.data.jobs || []).map((entry) => String(entry.jobId))));
-      } catch (e) {
-        console.warn("Could not load saved jobs:", e.message);
+      } catch (requestError) {
+        console.warn("Could not load saved jobs:", requestError.message);
       }
     };
     loadSaved();
@@ -58,16 +65,9 @@ export default function FeedPage() {
 
       const haystack = `${job.title} ${(job.tags || []).join(" ")} ${job.description || ""}`.toLowerCase();
 
-      // Category filtering
       if (activeCategory !== "All") {
-        // Map category strings to matching terms
-        let categoryTerms = [activeCategory.toLowerCase()];
-        if (activeCategory === "Full-Stack (MERN)") categoryTerms = ["full-stack", "full stack", "mern", "react", "node", "express", "mongodb"];
-        if (activeCategory === "AI/ML (Numpy/Pandas)") categoryTerms = ["ai", "ml", "machine learning", "artificial intelligence", "numpy", "pandas", "data science"];
-        if (activeCategory === "Frontend") categoryTerms = ["frontend", "front-end", "react", "vue", "angular", "ui"];
-        if (activeCategory === "Backend") categoryTerms = ["backend", "back-end", "node", "express", "django", "spring", "api"];
-
-        const matchesCategory = categoryTerms.some(term => haystack.includes(term));
+        const categoryTerms = categoryTermsMap[activeCategory] || [activeCategory.toLowerCase()];
+        const matchesCategory = categoryTerms.some((term) => haystack.includes(term));
         if (!matchesCategory) return false;
       }
 
@@ -79,87 +79,106 @@ export default function FeedPage() {
   const hasNextPage = page * pageSize < totalJobs;
   const activeWhereLabel = radius === "remote" ? "Remote" : location || "India";
 
+  const handleSave = async (job) => {
+    if (!isAuthenticated) return;
+    try {
+      await axiosInstance.post("/api/user/jobs/save", { jobId: String(job._id), jobData: job });
+      setSavedIds((current) => new Set([...current, String(job._id)]));
+    } catch (saveError) {
+      if (saveError.response?.status !== 409) console.error("Save job failed:", saveError.message);
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-slate-50 dark:bg-obsidian transition-colors duration-500">
+    <main className="min-h-screen bg-slate-50 transition-colors duration-500 dark:bg-[#030712]">
       <Navbar
         onSearch={(nextLocation, nextRole, nextRadius) => {
-          setLocation(nextLocation);
-          setRole(nextRole);
-          setRadius(nextRadius);
-          setPage(1);
+          setLocation(nextLocation); setRole(nextRole); setRadius(nextRadius); setPage(1);
         }}
       />
 
-      <div className="mx-auto max-w-[1600px] px-6 py-8">
-        {/* HEADER SECTION */}
-        <div className="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      {/* Subtle Background Mesh */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-0 dark:opacity-20">
+        <div className="absolute -left-[10%] -top-[10%] h-[50%] w-[50%] rounded-full bg-blue-600/20 blur-[150px]" />
+      </div>
+
+      <div className="relative mx-auto max-w-[1600px] px-6 py-8 lg:px-10 lg:py-12">
+        
+        {/* UNCLUTTERED HEADER */}
+        <header className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white md:text-4xl">
-              Smart Feed <span className="text-blue-600">.</span>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white md:text-4xl">
+              Discover Internships
             </h1>
-            <p className="mt-2 text-slate-500 dark:text-slate-400 font-medium">
-              Vetted opportunities in <span className="text-blue-500">{activeWhereLabel}</span>
+            <p className="mt-2 text-slate-500 dark:text-slate-400">
+              Showing <span className="font-semibold text-slate-900 dark:text-white">{visibleJobs.length}</span> opportunities in <span className="font-semibold text-blue-600 dark:text-blue-400">{activeWhereLabel}</span>
             </p>
           </div>
-          <div className="rounded-2xl bg-white/50 dark:bg-white/5 px-6 py-3 border border-white/20 dark:border-white/10 backdrop-blur-md shadow-sm">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">{visibleJobs.length}</span>
-            <span className="ml-2 text-sm text-slate-500 dark:text-slate-400 font-semibold">Matched Roles</span>
-          </div>
-        </div>
+        </header>
 
-        {/* CATEGORY SELECTOR UI */}
-        <div className="mb-10 w-full overflow-x-auto no-scrollbar py-2">
-          <div className="flex gap-3 px-1 min-w-max">
-            {JOB_CATEGORIES.map(cat => (
+        {/* SLEEK CATEGORY TABS (Replaces the heavy chips) */}
+        <div className="no-scrollbar mb-10 w-full overflow-x-auto border-b border-slate-200 dark:border-white/10">
+          <div className="flex min-w-max gap-8 px-1 pb-px">
+            {JOB_CATEGORIES.map((category) => (
               <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300 backdrop-blur-sm border shadow-sm ${activeCategory === cat
-                    ? "bg-blue-600 text-white border-blue-500/50 shadow-blue-500/20"
-                    : "bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 hover:-translate-y-0.5"
-                  }`}
+                key={category}
+                onClick={() => setActiveCategory(category)}
+                className={`relative pb-4 text-sm font-medium transition-colors ${
+                  activeCategory === category
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                }`}
               >
-                {cat}
+                {category}
+                {activeCategory === category && (
+                  <motion.div
+                    layoutId="activeCategoryIndicator"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"
+                  />
+                )}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[300px_1fr]">
-          {/* SIDEBAR - PREMIUM GLASS */}
-          <aside className="lg:sticky lg:top-28 lg:h-[calc(100vh-120px)] overflow-y-auto no-scrollbar">
-            <div className="rounded-[2.5rem] border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6 shadow-xl backdrop-blur-xl">
+        {/* MAIN LAYOUT */}
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[280px_1fr]">
+          
+          {/* SIDEBAR */}
+          <aside className="no-scrollbar overflow-y-auto lg:sticky lg:top-28 lg:h-[calc(100vh-120px)]">
+            {/* Removed the extra border/bg wrapper to let the FilterPanel breathe */}
+            <div className="pr-4">
               <FilterPanel onFilterChange={setFilters} />
             </div>
           </aside>
 
-          {/* JOB LISTING AREA */}
-          <section className="space-y-8">
+          {/* GRID SECTION */}
+          <section className="space-y-6">
             {error && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-3xl border border-red-500/20 bg-red-500/10 p-6 text-red-500 backdrop-blur-md">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
                 {error}
               </motion.div>
             )}
 
             {loading ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {Array.from({ length: 8 }).map((_, i) => <LoadingSkeleton key={i} />)}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, index) => <LoadingSkeleton key={index} />)}
               </div>
             ) : (
               <AnimatePresence mode="popLayout">
-                <motion.div layout className="grid gap-6 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <motion.div layout className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                   {visibleJobs.map((job) => (
                     <motion.div
                       layout
                       key={job._id}
-                      initial={{ opacity: 0, scale: 0.9 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.3 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
                     >
                       <InternshipCard
                         job={job}
-                        onSave={isAuthenticated ? (j) => console.log("Save", j) : undefined}
+                        onSave={isAuthenticated ? handleSave : undefined}
                         isSaved={savedIds.has(String(job._id))}
                       />
                     </motion.div>
@@ -170,32 +189,34 @@ export default function FeedPage() {
 
             {/* EMPTY STATE */}
             {!loading && visibleJobs.length === 0 && (
-              <div className="flex flex-col items-center justify-center rounded-[3rem] border border-dashed border-slate-300 dark:border-white/10 py-24 text-center bg-white/40 dark:bg-white/5 backdrop-blur-sm">
-                <div className="h-16 w-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-6 text-2xl">
-                  🔍
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="mb-4 rounded-full bg-slate-100 p-4 dark:bg-white/5">
+                  <span className="text-2xl">🔍</span>
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">No Internships Found</h3>
-                <p className="mt-2 text-slate-500 dark:text-slate-400">Try broadening your location, checking "Remote Only", or selecting "All" categories.</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">No matches found</h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Try adjusting your filters or selecting "All" categories.
+                </p>
               </div>
             )}
 
-            {/* PAGINATION - PREMIUM STYLE */}
+            {/* MINIMAL PAGINATION */}
             {totalJobs > 0 && Math.ceil(totalJobs / pageSize) > 1 && (
-              <div className="flex items-center justify-center gap-4 py-12">
+              <div className="flex items-center justify-center gap-4 border-t border-slate-200 pt-8 dark:border-white/10">
                 <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
                   disabled={page === 1}
-                  className="flex h-12 items-center justify-center rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-6 font-bold text-slate-800 dark:text-white shadow-lg backdrop-blur-md transition-all hover:scale-105 disabled:opacity-30 disabled:hover:scale-100"
+                  className="text-sm font-medium text-slate-600 disabled:opacity-30 dark:text-slate-400"
                 >
-                  ← Prev
+                  ← Previous
                 </button>
-                <div className="flex h-12 min-w-[3rem] items-center justify-center rounded-2xl bg-blue-600 px-6 font-bold text-white shadow-blue-500/40 shadow-xl">
-                  {page}
-                </div>
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Page {page}
+                </span>
                 <button
-                  onClick={() => setPage(p => p + 1)}
+                  onClick={() => setPage((current) => current + 1)}
                   disabled={!hasNextPage}
-                  className="flex h-12 items-center justify-center rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-6 font-bold text-slate-800 dark:text-white shadow-lg backdrop-blur-md transition-all hover:scale-105 disabled:opacity-30 disabled:hover:scale-100"
+                  className="text-sm font-medium text-slate-600 disabled:opacity-30 dark:text-slate-400"
                 >
                   Next →
                 </button>

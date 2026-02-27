@@ -107,6 +107,40 @@ Tags: ${(job.tags || []).join(", ")}
     }
   });
 
+
   analysisQueue = analysisPromise.catch(() => defaultAnalysis);
   return analysisPromise;
+};
+
+export const generateOutreachEmail = async (user, job) => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("Gemini API Key is not configured.");
+  }
+
+  // Use the specific 2.5-flash model as requested by the user
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `
+You are an expert career coach. Write a concise, highly professional cold outreach email (max 3 short paragraphs) for the student to send to a hiring manager. 
+Match the student's skills/bio to the specific requirements of this job description. Do not use cringe buzzwords. Include a subject line.
+
+Student Profile:
+Name: ${user.displayName || "A highly motivated student"}
+Bio: ${user.bio || "No bio provided."}
+Skills: ${(user.skills || []).join(", ") || "General software development skills"}
+
+Job Description:
+Job Title: ${job.title}
+Company: ${job.company}
+Description: ${job.description}
+  `;
+
+  try {
+    const response = await model.generateContent(prompt);
+    return response.response.text().trim();
+  } catch (error) {
+    console.error("Gemini outreach generation error:", error.message);
+    throw new Error("Failed to generate outreach email with AI.");
+  }
 };

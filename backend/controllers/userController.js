@@ -1,4 +1,5 @@
 import SavedJob from "../models/SavedJob.js";
+import { generateOutreachEmail } from "../services/geminiService.js";
 
 export const saveJob = async (req, res) => {
   try {
@@ -61,5 +62,25 @@ export const updateJobStatus = async (req, res) => {
   } catch (error) {
     console.error("updateJobStatus error:", error.message);
     return res.status(500).json({ error: "Failed to update status." });
+  }
+};
+
+export const generateOutreach = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    // Fetch the saved job for this user to get the job context
+    const savedJobResult = await SavedJob.findOne({ userId: req.user._id, jobId });
+    if (!savedJobResult) {
+      return res.status(404).json({ error: "Saved job not found." });
+    }
+
+    // Call Gemini Service
+    const emailDraft = await generateOutreachEmail(req.user, savedJobResult.jobData);
+
+    return res.json({ success: true, draft: emailDraft });
+  } catch (error) {
+    console.error("generateOutreach error:", error.message);
+    return res.status(500).json({ error: error.message || "Failed to generate outreach email." });
   }
 };

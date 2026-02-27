@@ -43,92 +43,89 @@ export default function Navbar({ onSearch }) {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/50 dark:border-white/5 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl transition-colors duration-500">
-      <div className="mx-auto max-w-7xl px-6 py-4">
-        <div className="flex items-center justify-between">
-          <Link to="/" className="font-display text-2xl font-extrabold tracking-tight text-blue-600 dark:text-blue-500 hover:opacity-80 transition-opacity">
-            InternVue<span className="text-slate-800 dark:text-white">.</span>
+    <header className="nav-shell sticky top-0 z-40">
+      <div className="mx-auto max-w-7xl p-4 md:p-6">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="inline-flex items-center gap-2 font-display text-2xl font-extrabold tracking-tight text-blue-600">
+            <img
+              src="/logoo.jpeg"
+              alt="InternVue logo"
+              className="h-8 w-8 rounded-lg object-cover ring-1 ring-slate-200/60 dark:ring-white/20"
+            />
+            <span>
+              InternVue<span className="text-main">.</span>
+            </span>
           </Link>
 
           <button
             type="button"
-            className="ml-auto flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-white backdrop-blur-md md:hidden"
+            className="btn-secondary ml-auto block px-3 py-1.5 text-sm md:hidden"
             onClick={() => setMobileMenuOpen((current) => !current)}
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? "✕" : "☰"}
+            {mobileMenuOpen ? "Close" : "Menu"}
           </button>
 
-          <div className="hidden items-center gap-4 md:flex">
+          <div className="ml-auto hidden items-center gap-3 md:flex">
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-white shadow-sm transition-all hover:scale-105 hover:bg-white dark:hover:bg-white/10"
+              className="theme-toggle inline-flex h-10 w-10 items-center justify-center"
               aria-label="Toggle dark and light mode"
               title={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
               {isDark ? <SunIcon /> : <MoonIcon />}
             </button>
 
-            {loading ? (
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-            ) : null}
+            {loading ? <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : null}
 
             {!loading && !isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <Link to="/login" className="px-5 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              <>
+                <Link to="/login" className="btn-secondary px-4 py-2 text-sm">
                   Sign In
                 </Link>
-                <Link to="/register" className="rounded-full bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-blue-500/40">
+                <Link to="/register" className="btn-primary px-5 py-2 text-sm">
                   Get Started
                 </Link>
-              </div>
+              </>
             ) : null}
 
             {user ? (
-              <div className="relative ml-2" ref={dropdownRef}>
+              <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setDropdownOpen((current) => !current)}
-                  className="flex items-center gap-3 rounded-full border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/5 p-1.5 pr-4 text-sm font-semibold text-slate-700 dark:text-white shadow-sm transition-all hover:bg-white dark:hover:bg-white/10 focus:ring-2 focus:ring-blue-500/50"
+                  className="btn-secondary flex items-center gap-2 px-3 py-1.5"
                 >
                   {user.photoURL ? (
-                    <img
-                      src={user.photoURL}
-                      alt={user.displayName || "User"}
-                      className="h-8 w-8 rounded-full object-cover shadow-sm"
-                    />
+                    <img src={user.photoURL} alt={user.displayName || "User"} className="h-8 w-8 rounded-full object-cover" />
                   ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-display text-xs font-bold text-white shadow-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                       {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
                     </div>
                   )}
-                  <span className="max-w-[120px] truncate">
-                    {user.displayName || user.email}
-                  </span>
-                  <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <span className="max-w-[140px] truncate text-sm font-semibold text-main">{user.displayName || user.email}</span>
+                  <span className="text-xs text-muted">v</span>
                 </button>
 
                 {dropdownOpen ? (
-                  <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-zinc-900/95 shadow-xl backdrop-blur-xl transition-all">
-                    <div className="border-b border-slate-100 dark:border-zinc-800 px-5 py-4">
-                      <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{user.displayName || "Student"}</p>
-                      <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">{user.email}</p>
+                  <div className="section-shell absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden">
+                    <div className="border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+                      <p className="truncate text-sm font-semibold text-main">{user.displayName || "Student"}</p>
+                      <p className="truncate text-xs text-muted">{user.email}</p>
                     </div>
                     <div className="p-2">
                       <Link
                         to="/dashboard"
-                        className="block rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                        className="block rounded-lg px-3 py-2 text-sm text-soft hover:surface-soft"
                         onClick={() => setDropdownOpen(false)}
                       >
                         Dashboard
                       </Link>
                       <Link
                         to="/feed"
-                        className="block rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                        className="block rounded-lg px-3 py-2 text-sm text-soft hover:surface-soft"
                         onClick={() => setDropdownOpen(false)}
                       >
                         Browse Jobs
@@ -136,7 +133,7 @@ export default function Navbar({ onSearch }) {
                       <button
                         type="button"
                         onClick={handleLogout}
-                        className="mt-1 block w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                        className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50"
                       >
                         Sign Out
                       </button>
@@ -149,7 +146,7 @@ export default function Navbar({ onSearch }) {
         </div>
 
         {onSearch ? (
-          <div className="mt-3">
+          <div className="mt-4">
             <SearchBar onSearch={onSearch} />
           </div>
         ) : null}
@@ -174,37 +171,21 @@ export default function Navbar({ onSearch }) {
 
             {!loading && !isAuthenticated ? (
               <>
-                <Link
-                  to="/login"
-                  className="btn-secondary block w-full px-3 py-2 text-center text-sm"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/login" className="btn-secondary block w-full px-3 py-2 text-center text-sm" onClick={() => setMobileMenuOpen(false)}>
                   Sign In
                 </Link>
-                <Link
-                  to="/register"
-                  className="btn-primary block w-full px-3 py-2 text-center text-sm"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Get Started -&gt;
+                <Link to="/register" className="btn-primary block w-full px-3 py-2 text-center text-sm" onClick={() => setMobileMenuOpen(false)}>
+                  Get Started
                 </Link>
               </>
             ) : null}
 
             {user ? (
               <>
-                <Link
-                  to="/dashboard"
-                  className="btn-secondary block w-full px-3 py-2 text-center text-sm"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/dashboard" className="btn-secondary block w-full px-3 py-2 text-center text-sm" onClick={() => setMobileMenuOpen(false)}>
                   Dashboard
                 </Link>
-                <Link
-                  to="/feed"
-                  className="btn-secondary block w-full px-3 py-2 text-center text-sm"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/feed" className="btn-secondary block w-full px-3 py-2 text-center text-sm" onClick={() => setMobileMenuOpen(false)}>
                   Browse Jobs
                 </Link>
                 <button

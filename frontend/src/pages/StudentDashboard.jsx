@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion"; // Make sure this is installed
 import Navbar from "../components/Navbar";
 import VoiceMentorButton from "../components/VoiceMentorButton";
+import OutreachModal from "../components/OutreachModal";
 import { useAuthContext } from "../context/AuthContext";
 import axiosInstance from "../api/axiosInstance";
 
@@ -30,6 +31,7 @@ export default function StudentDashboard() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [error, setError] = useState("");
   const [skillInput, setSkillInput] = useState("");
+  const [outreachModalJob, setOutreachModalJob] = useState(null);
 
   const [form, setForm] = useState({
     githubUrl: "", portfolioUrl: "", resumeUrl: "", bio: "", skills: [],
@@ -98,7 +100,7 @@ export default function StudentDashboard() {
     try {
       await axiosInstance.patch("/api/auth/profile", form);
       await refreshProfile();
-    } catch (err) { setError(err.response?.data?.error || "Failed to save profile."); } 
+    } catch (err) { setError(err.response?.data?.error || "Failed to save profile."); }
     finally { setSavingProfile(false); }
   };
 
@@ -133,14 +135,14 @@ export default function StudentDashboard() {
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-[#030712] transition-colors duration-500">
       <Navbar />
-      
+
       {/* Background Mesh (Invisible in light mode, soft glow in dark mode) */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-0 dark:opacity-40">
         <div className="absolute -top-[10%] -right-[10%] h-[50%] w-[50%] rounded-full bg-blue-600/20 blur-[120px]" />
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 py-8 lg:px-8">
-        
+
         {/* PREMIUM COMMAND HEADER */}
         <section className="mb-8 overflow-hidden rounded-[2rem] border border-slate-200 bg-white/80 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-2xl dark:border-white/10 dark:bg-white/5 dark:shadow-none">
           <div className="flex flex-col items-center gap-6 text-center md:flex-row md:text-left">
@@ -154,7 +156,7 @@ export default function StudentDashboard() {
               )}
               <div className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-4 border-white bg-emerald-500 dark:border-[#030712]"></div>
             </div>
-            
+
             <div className="flex-1">
               <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white">
                 {user?.displayName || "Student Command Center"}
@@ -178,11 +180,10 @@ export default function StudentDashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex shrink-0 items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${
-                activeTab === tab.id
+              className={`flex shrink-0 items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${activeTab === tab.id
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
                   : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10"
-              }`}
+                }`}
             >
               <span>{tab.icon}</span> {tab.label}
             </button>
@@ -197,7 +198,7 @@ export default function StudentDashboard() {
 
         {/* TAB CONTENT WITH ANIMATIONS */}
         <AnimatePresence mode="wait">
-          
+
           {/* IDENTITY TAB */}
           {activeTab === "profile" && (
             <motion.section key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid gap-6 lg:grid-cols-3">
@@ -208,7 +209,7 @@ export default function StudentDashboard() {
                   <input value={form.portfolioUrl} onChange={(e) => setForm({ ...form, portfolioUrl: e.target.value })} placeholder="Portfolio URL" className={inputClass} />
                   <input value={form.resumeUrl} onChange={(e) => setForm({ ...form, resumeUrl: e.target.value })} placeholder="Resume Link (PDF)" className={`md:col-span-2 ${inputClass}`} />
                 </div>
-                
+
                 <h2 className="mb-4 mt-8 text-xl font-bold text-slate-900 dark:text-white">Location Details</h2>
                 <div className="grid gap-4 md:grid-cols-3">
                   <input value={form.location.city} onChange={(e) => setForm({ ...form, location: { ...form.location, city: e.target.value } })} placeholder="City" className={inputClass} />
@@ -238,9 +239,9 @@ export default function StudentDashboard() {
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/10">
-                   <button onClick={saveProfile} disabled={savingProfile} className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-600/20 transition-transform hover:scale-[1.02] disabled:opacity-50">
-                     {savingProfile ? "Syncing to Database..." : "Save Complete Profile"}
-                   </button>
+                  <button onClick={saveProfile} disabled={savingProfile} className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-600/20 transition-transform hover:scale-[1.02] disabled:opacity-50">
+                    {savingProfile ? "Syncing to Database..." : "Save Complete Profile"}
+                  </button>
                 </div>
               </div>
             </motion.section>
@@ -265,6 +266,7 @@ export default function StudentDashboard() {
                       <select value={entry.status} onChange={(e) => updateStatus(entry.jobId, e.target.value)} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 outline-none dark:border-white/10 dark:bg-black/20 dark:text-slate-300">
                         {statusOrder.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                       </select>
+                      <button onClick={() => setOutreachModalJob(entry)} className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20">✨ Draft</button>
                       <button onClick={() => unsave(entry.jobId)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20">Remove</button>
                     </div>
                   </div>
@@ -313,7 +315,7 @@ export default function StudentDashboard() {
                     </span>
                     <span className="rounded-full bg-slate-200 px-2 py-0.5 text-slate-600 dark:bg-white/10 dark:text-slate-300">{(kanban[status] || []).length}</span>
                   </h3>
-                  
+
                   <div className="space-y-3">
                     <AnimatePresence>
                       {(kanban[status] || []).map((entry) => (
@@ -339,6 +341,12 @@ export default function StudentDashboard() {
           )}
         </AnimatePresence>
       </div>
+
+      <OutreachModal
+        isOpen={!!outreachModalJob}
+        onClose={() => setOutreachModalJob(null)}
+        job={outreachModalJob}
+      />
     </main>
   );
 }

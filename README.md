@@ -25,10 +25,8 @@
 
 ## 📸 Platform Preview
 
-> **Note:** Replace the placeholder below with a screenshot of your actual running application. Save your image to a `/docs` folder and update the path `docs/dashboard.png`.
-
 <div align="center">
-  <img src="https://placehold.co/1200x675/0f172a/38bdf8.png?text=InternVue+Dashboard+Preview&font=montserrat" alt="InternVue Student Dashboard Screenshot" width="100%" />
+  <img src="https://i.postimg.cc/wxS3vrQj/Screenshot-2026-02-28-012048.png" alt="InternVue Student Dashboard Screenshot" width="100%" />
 </div>
 
 <br />

@@ -24,7 +24,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:3000","https://vueback-w90b.onrender.com"],
+    origin: ["http://localhost:5173", "http://localhost:3000","https://internvue.onrender.com"],
     credentials: true,
   })
 );

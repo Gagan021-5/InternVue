@@ -3,7 +3,6 @@ import {
   saveJob,
   unsaveJob,
   getSavedJobs,
-  getSavedJobs,
   updateJobStatus,
   generateOutreach,
 } from "../controllers/userController.js";

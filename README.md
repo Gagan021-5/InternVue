@@ -36,7 +36,7 @@
 
 - 🎨 **Premium UI/UX:** Built with Tailwind CSS, Framer Motion, and Glassmorphism design principles. Includes full Dark/Light mode support with persistence.
 - 🔐 **Robust Authentication:** Secure JWT-based email/password registration alongside Social OAuth (Google, GitHub) handled via Firebase and synced to MongoDB.
-- ⚡ **Real-Time Job Aggregation:** Integrates with the Adzuna API / RapidAPI to fetch, map, and organize thousands of global internship opportunities.
+- ⚡ **Real-Time Job Aggregation:** Integrates with the Adzuna API to fetch, map, and organize thousands of global internship opportunities.
 - 🧠 **AI-Powered "Mentor":** Employs Google's Gemini AI to analyze raw job descriptions and instantly generate custom, targeted interview prep questions.
 - ✨ **AI Cover Letter & Outreach:** Instantly generates highly professional, personalized cold outreach emails tailored to the student's profile and the specific job description using Gemini 2.5 Flash.
 - 📊 **Kanban Pipeline Tracker:** A beautifully interactive, drag-and-drop Kanban board enabling students to track application statuses (`Saved`, `Applied`, `Interviewing`, `Accepted`).

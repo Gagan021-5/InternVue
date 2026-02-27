@@ -9,11 +9,11 @@ export default function AiScoreBar({ score = 0, label = "AI Authenticity Score" 
 
   return (
     <div className="section-shell p-3">
-      <div className="text-muted mb-2 flex items-center justify-between text-xs">
+      <div className="mb-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span>{label}</span>
         <span className="font-mono">{clamped}/100</span>
       </div>
-      <div className="surface-soft h-2 w-full overflow-hidden rounded-full">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800">
         <div
           className={`h-full bg-gradient-to-r ${getColor()} transition-all duration-500`}
           style={{ width: `${clamped}%` }}

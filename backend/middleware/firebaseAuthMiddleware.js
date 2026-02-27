@@ -1,4 +1,4 @@
-import admin from "../config/firebaseAdmin.js";
+import admin from "../config/firebaseAdmin.js"; // Ensure this path matches your folder structure
 import User from "../models/User.js";
 
 export const protect = async (req, res, next) => {

@@ -188,7 +188,7 @@ export default function SearchBar({ onSearch }) {
             </div>
           ) : null}
 
-          {suggestLoading ? <p className="text-muted mt-1 text-xs px-2 text-slate-500">Looking up cities...</p> : null}
+          {suggestLoading ? <p className="mt-1 px-2 text-xs text-slate-500 dark:text-slate-400">Looking up cities...</p> : null}
         </div>
 
         <label className="space-y-1.5">

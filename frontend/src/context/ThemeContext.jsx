@@ -16,9 +16,15 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
-    root.setAttribute("data-theme", theme);
+    const body = window.document.body;
+
+    [root, body].forEach((node) => {
+      node.classList.remove("light", "dark");
+      node.classList.add(theme);
+      node.setAttribute("data-theme", theme);
+      node.style.colorScheme = theme;
+    });
+
     localStorage.setItem("internvue-theme", theme);
   }, [theme]);
 

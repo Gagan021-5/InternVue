@@ -79,7 +79,7 @@ function AdminDashboardContent() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 lg:px-8">
         <section className="section-shell p-6">
           <h1 className="font-display text-2xl font-semibold text-main">Admin Dashboard</h1>
-          <p className="text-muted mt-1 text-sm">Post and verify local internship opportunities.</p>
+          <p className="mt-1 text-sm text-muted">Post and verify local internship opportunities.</p>
 
           <form onSubmit={submit} className="mt-5 grid gap-3 md:grid-cols-2">
             <input
@@ -87,52 +87,52 @@ function AdminDashboardContent() {
               onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
               placeholder="Title"
               required
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <input
               value={form.company}
               onChange={(event) => setForm((current) => ({ ...current, company: event.target.value }))}
               placeholder="Company"
               required
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <input
               value={form.location}
               onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
               placeholder="Location"
               required
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <input
               value={form.applyUrl}
               onChange={(event) => setForm((current) => ({ ...current, applyUrl: event.target.value }))}
               placeholder="Apply URL"
               required
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <input
               value={form.salary}
               onChange={(event) => setForm((current) => ({ ...current, salary: event.target.value }))}
               placeholder="Salary"
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <input
               value={form.tags}
               onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
               placeholder="Tags (comma separated)"
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <input
               value={form.lat}
               onChange={(event) => setForm((current) => ({ ...current, lat: event.target.value }))}
               placeholder="Latitude"
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <input
               value={form.lng}
               onChange={(event) => setForm((current) => ({ ...current, lng: event.target.value }))}
               placeholder="Longitude"
-              className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium px-3 py-2 text-sm"
             />
             <textarea
               value={form.description}
@@ -141,9 +141,9 @@ function AdminDashboardContent() {
               }
               rows={4}
               placeholder="Description"
-              className="md:col-span-2 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              className="input-premium md:col-span-2 px-3 py-2 text-sm"
             />
-            <label className="md:col-span-2 flex items-center gap-2 text-sm text-zinc-300">
+            <label className="md:col-span-2 flex items-center gap-2 text-sm text-soft">
               <input
                 type="checkbox"
                 checked={form.isVerified}
@@ -169,7 +169,7 @@ function AdminDashboardContent() {
           <h2 className="font-display text-xl font-semibold text-main">Local Jobs</h2>
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="text-zinc-500">
+              <thead className="text-muted">
                 <tr>
                   <th className="px-3 py-2">Title</th>
                   <th className="px-3 py-2">Company</th>
@@ -179,7 +179,7 @@ function AdminDashboardContent() {
               </thead>
               <tbody>
                 {jobs.map((job) => (
-                  <tr key={job._id} className="border-t border-zinc-800 text-zinc-300">
+                  <tr key={job._id} className="border-t text-soft" style={{ borderColor: "var(--border)" }}>
                     <td className="px-3 py-2">{job.title}</td>
                     <td className="px-3 py-2">{job.company}</td>
                     <td className="px-3 py-2">{job.location}</td>

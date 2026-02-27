@@ -95,116 +95,116 @@ export default function LoginPage() {
       <div className="mx-auto w-full max-w-md p-4 md:p-8">
         <div className="section-shell p-6 shadow-2xl md:p-8">
           <p className="font-display text-xl font-bold text-blue-500 md:text-2xl">InternVue</p>
-          <h1 className="text-main mt-2 font-display text-2xl font-semibold md:text-3xl">Sign in to InternVue</h1>
+          <h1 className="mt-2 font-display text-2xl font-semibold text-slate-900 dark:text-white md:text-3xl">Sign in to InternVue</h1>
 
-        {error ? (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-400">
-            <span>!</span>
-            <span>{error}</span>
-            <button onClick={clearError} className="ml-auto text-red-600 hover:text-red-400">
-              x
-            </button>
-          </div>
-        ) : null}
-
-        {showReset ? (
-          <form onSubmit={onResetSubmit} className="mt-6 space-y-4">
-            <input
-              type="email"
-              value={resetEmail}
-              onChange={(event) => setResetEmail(event.target.value)}
-              placeholder="Enter your account email"
-              className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-blue-500"
-              required
-            />
-            <button
-              type="submit"
-              disabled={isBusy}
-              className="w-full rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60 md:text-base"
-            >
-              {loadingProvider === "reset" ? "Sending..." : "Send Reset Link"}
-            </button>
-            {resetSent ? (
-              <p className="rounded-xl border border-emerald-800 bg-emerald-950 px-4 py-2 text-sm text-emerald-400">
-                Check your inbox for a password reset link
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                setShowReset(false);
-                setResetSent(false);
-              }}
-              className="text-sm text-zinc-400 underline"
-            >
-              Back to login
-            </button>
-          </form>
-        ) : (
-          <>
-            <div className="mt-6 space-y-3">
-              <button
-                type="button"
-                onClick={() => runLogin("google", signInWithGoogle)}
-                disabled={isBusy}
-                className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:opacity-60 md:text-base"
-              >
-                {loadingProvider === "google" ? <Spinner /> : <GoogleIcon />}
-                Continue with Google
-              </button>
-
-              <button
-                type="button"
-                onClick={() => runLogin("github", signInWithGithub)}
-                disabled={isBusy}
-                className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 md:text-base"
-              >
-                {loadingProvider === "github" ? <Spinner /> : <GithubIcon />}
-                Continue with GitHub
+          {error ? (
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-400">
+              <span>!</span>
+              <span>{error}</span>
+              <button onClick={clearError} className="ml-auto text-red-600 hover:text-red-400">
+                x
               </button>
             </div>
+          ) : null}
 
-            <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
-              <div className="h-px flex-1 bg-zinc-800" />
-              <span>or continue with email</span>
-              <div className="h-px flex-1 bg-zinc-800" />
-            </div>
-
-            <form onSubmit={onEmailSubmit} className="space-y-3">
+          {showReset ? (
+            <form onSubmit={onResetSubmit} className="mt-6 space-y-4">
               <input
                 type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-blue-500"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                value={resetEmail}
+                onChange={(event) => setResetEmail(event.target.value)}
+                placeholder="Enter your account email"
                 className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-blue-500"
                 required
               />
               <button
                 type="submit"
                 disabled={isBusy}
-                className="glow-blue-sm w-full rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-500 disabled:opacity-60 md:text-base"
+                className="w-full rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60 md:text-base"
               >
-                {loadingProvider === "email" ? "Signing in..." : "Sign In with Email"}
+                {loadingProvider === "reset" ? "Sending..." : "Send Reset Link"}
+              </button>
+              {resetSent ? (
+                <p className="rounded-xl border border-emerald-800 bg-emerald-950 px-4 py-2 text-sm text-emerald-400">
+                  Check your inbox for a password reset link
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowReset(false);
+                  setResetSent(false);
+                }}
+                className="text-sm text-zinc-400 underline"
+              >
+                Back to login
               </button>
             </form>
+          ) : (
+            <>
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => runLogin("google", signInWithGoogle)}
+                  disabled={isBusy}
+                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 disabled:opacity-60 md:text-base"
+                >
+                  {loadingProvider === "google" ? <Spinner /> : <GoogleIcon />}
+                  Continue with Google
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setShowReset(true)}
-              className="mt-3 text-sm text-zinc-400 underline"
-            >
-              Forgot password?
-            </button>
-          </>
-        )}
+                <button
+                  type="button"
+                  onClick={() => runLogin("github", signInWithGithub)}
+                  disabled={isBusy}
+                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-60 md:text-base"
+                >
+                  {loadingProvider === "github" ? <Spinner /> : <GithubIcon />}
+                  Continue with GitHub
+                </button>
+              </div>
+
+              <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
+                <div className="h-px flex-1 bg-zinc-800" />
+                <span>or continue with email</span>
+                <div className="h-px flex-1 bg-zinc-800" />
+              </div>
+
+              <form onSubmit={onEmailSubmit} className="space-y-3">
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-blue-500"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-blue-500"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={isBusy}
+                  className="glow-blue-sm w-full rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-500 disabled:opacity-60 md:text-base"
+                >
+                  {loadingProvider === "email" ? "Signing in..." : "Sign In with Email"}
+                </button>
+              </form>
+
+              <button
+                type="button"
+                onClick={() => setShowReset(true)}
+                className="mt-3 text-sm text-zinc-400 underline"
+              >
+                Forgot password?
+              </button>
+            </>
+          )}
 
           <p className="mt-5 text-sm text-zinc-400">
             Don't have an account?{" "}

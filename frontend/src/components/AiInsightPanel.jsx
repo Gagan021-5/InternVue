@@ -1,7 +1,7 @@
 export default function AiInsightPanel({ aiAnalysis }) {
   if (!aiAnalysis) {
     return (
-      <div className="section-shell text-muted p-3 text-xs">
+      <div className="section-shell p-3 text-xs text-slate-600 dark:text-slate-400">
         AI insights are currently unavailable for this role.
       </div>
     );

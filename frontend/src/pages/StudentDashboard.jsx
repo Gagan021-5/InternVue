@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion"; // Make sure this is installed
 import Navbar from "../components/Navbar";
 import VoiceMentorButton from "../components/VoiceMentorButton";
 import { useAuthContext } from "../context/AuthContext";
 import axiosInstance from "../api/axiosInstance";
 
-const tabs = ["profile", "saved", "prep", "tracker"];
+const tabs = [
+  { id: "profile", label: "Career Identity", icon: "👤" },
+  { id: "saved", label: "Saved Opportunities", icon: "🔖" },
+  { id: "prep", label: "AI Interview Prep", icon: "🧠" },
+  { id: "tracker", label: "Pipeline Tracker", icon: "📈" },
+];
+
 const statusOrder = ["saved", "applied", "interviewing", "accepted", "rejected"];
 
 const statusStyles = {
-  saved: "bg-blue-950 border border-blue-800 text-blue-300",
-  applied: "bg-indigo-950 border border-indigo-800 text-indigo-300",
-  interviewing: "bg-amber-950 border border-amber-800 text-amber-300",
-  accepted: "bg-emerald-950 border border-emerald-800 text-emerald-300",
-  rejected: "bg-red-950 border border-red-800 text-red-300",
+  saved: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border-blue-200 dark:border-blue-500/20",
+  applied: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20",
+  interviewing: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20",
+  accepted: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
+  rejected: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border-red-200 dark:border-red-500/20",
 };
 
 export default function StudentDashboard() {
@@ -25,56 +32,37 @@ export default function StudentDashboard() {
   const [skillInput, setSkillInput] = useState("");
 
   const [form, setForm] = useState({
-    githubUrl: "",
-    portfolioUrl: "",
-    resumeUrl: "",
-    bio: "",
-    skills: [],
+    githubUrl: "", portfolioUrl: "", resumeUrl: "", bio: "", skills: [],
     location: { city: "", state: "", country: "" },
   });
 
+  // Keep your existing data loading logic untouched
   const loadDashboardData = async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
-      const [meResponse, savedResponse] = await Promise.all([
+      const [meRes, savedRes] = await Promise.all([
         axiosInstance.get("/api/auth/me"),
         axiosInstance.get("/api/user/jobs"),
       ]);
-
-      const mongoProfile = meResponse.data?.user;
-      setSavedJobs(savedResponse.data?.jobs || []);
+      const p = meRes.data?.user;
+      setSavedJobs(savedRes.data?.jobs || []);
       setForm({
-        githubUrl: mongoProfile?.githubUrl || "",
-        portfolioUrl: mongoProfile?.portfolioUrl || "",
-        resumeUrl: mongoProfile?.resumeUrl || "",
-        bio: mongoProfile?.bio || "",
-        skills: Array.isArray(mongoProfile?.skills) ? mongoProfile.skills : [],
-        location: {
-          city: mongoProfile?.location?.city || "",
-          state: mongoProfile?.location?.state || "",
-          country: mongoProfile?.location?.country || "",
-        },
+        githubUrl: p?.githubUrl || "", portfolioUrl: p?.portfolioUrl || "", resumeUrl: p?.resumeUrl || "",
+        bio: p?.bio || "", skills: Array.isArray(p?.skills) ? p.skills : [],
+        location: { city: p?.location?.city || "", state: p?.location?.state || "", country: p?.location?.country || "" },
       });
-    } catch (requestError) {
-      console.error("Dashboard load failed:", requestError.message);
-      setError(requestError.response?.data?.error || "Could not load dashboard.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Could not load dashboard.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  useEffect(() => { loadDashboardData(); }, []);
 
   const providers = useMemo(() => {
-    const providerIds = user?.providerData?.map((provider) => provider.providerId) || [];
-    return {
-      google: providerIds.includes("google.com"),
-      github: providerIds.includes("github.com"),
-      email: providerIds.includes("password"),
-    };
+    const ids = user?.providerData?.map((p) => p.providerId) || [];
+    return { google: ids.includes("google.com"), github: ids.includes("github.com"), email: ids.includes("password") };
   }, [user]);
 
   const groupedQuestions = useMemo(() => {
@@ -86,10 +74,7 @@ export default function StudentDashboard() {
       if (!map.has(company)) map.set(company, []);
       map.get(company).push(...questions);
     });
-    return Array.from(map.entries()).map(([company, questions]) => ({
-      company,
-      questions: [...new Set(questions)],
-    }));
+    return Array.from(map.entries()).map(([company, questions]) => ({ company, questions: [...new Set(questions)] }));
   }, [savedJobs]);
 
   const kanban = useMemo(() => {
@@ -100,345 +85,259 @@ export default function StudentDashboard() {
   }, [savedJobs]);
 
   const addSkill = () => {
-    const value = skillInput.trim();
-    if (!value) return;
-    setForm((current) => ({
-      ...current,
-      skills: current.skills.includes(value) ? current.skills : [...current.skills, value],
-    }));
+    const val = skillInput.trim();
+    if (!val) return;
+    setForm((curr) => ({ ...curr, skills: curr.skills.includes(val) ? curr.skills : [...curr.skills, val] }));
     setSkillInput("");
   };
 
-  const removeSkill = (skill) => {
-    setForm((current) => ({
-      ...current,
-      skills: current.skills.filter((entry) => entry !== skill),
-    }));
-  };
+  const removeSkill = (skill) => setForm((curr) => ({ ...curr, skills: curr.skills.filter((s) => s !== skill) }));
 
   const saveProfile = async () => {
-    setSavingProfile(true);
-    setError("");
+    setSavingProfile(true); setError("");
     try {
-      const response = await axiosInstance.patch("/api/auth/profile", form);
+      await axiosInstance.patch("/api/auth/profile", form);
       await refreshProfile();
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || "Failed to save profile.");
-    } finally {
-      setSavingProfile(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || "Failed to save profile."); } 
+    finally { setSavingProfile(false); }
   };
 
   const updateStatus = async (jobId, status) => {
     try {
       await axiosInstance.patch(`/api/user/jobs/${jobId}/status`, { status });
-      setSavedJobs((current) =>
-        current.map((item) => (item.jobId === jobId ? { ...item, status } : item))
-      );
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || "Failed to update status.");
-    }
+      setSavedJobs((curr) => curr.map((item) => (item.jobId === jobId ? { ...item, status } : item)));
+    } catch (err) { setError(err.response?.data?.error || "Failed to update status."); }
   };
 
   const unsave = async (jobId) => {
     try {
       await axiosInstance.delete(`/api/user/jobs/${jobId}`);
-      setSavedJobs((current) => current.filter((item) => item.jobId !== jobId));
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || "Failed to remove saved job.");
-    }
+      setSavedJobs((curr) => curr.filter((item) => item.jobId !== jobId));
+    } catch (err) { setError(err.response?.data?.error || "Failed to remove saved job."); }
   };
 
   if (loading) {
     return (
-      <main className="app-bg">
+      <main className="min-h-screen bg-slate-50 dark:bg-[#030712] transition-colors duration-300">
         <Navbar />
-        <div className="text-muted mx-auto max-w-5xl px-4 py-8">Loading dashboard...</div>
+        <div className="flex h-[60vh] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+        </div>
       </main>
     );
   }
 
+  // Premium input class to keep JSX clean
+  const inputClass = "w-full rounded-2xl border border-slate-200 bg-white/50 px-4 py-3 text-sm text-slate-900 outline-none backdrop-blur-sm transition-all focus:border-blue-500 focus:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-blue-500 dark:focus:bg-white/10";
+
   return (
-    <main className="app-bg">
+    <main className="min-h-screen bg-slate-50 dark:bg-[#030712] transition-colors duration-500">
       <Navbar />
-      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">
-        <section className="section-shell mb-6 p-6">
-          <div className="flex flex-wrap items-center gap-4">
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName || "User"} className="h-14 w-14 rounded-full object-cover" />
-            ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-xl font-bold text-white">
-                {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-              </div>
-            )}
-            <div>
-              <h1 className="font-display text-2xl font-semibold text-main">
-                {user?.displayName || "Student Dashboard"}
+      
+      {/* Background Mesh (Invisible in light mode, soft glow in dark mode) */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-0 dark:opacity-40">
+        <div className="absolute -top-[10%] -right-[10%] h-[50%] w-[50%] rounded-full bg-blue-600/20 blur-[120px]" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl px-4 py-8 lg:px-8">
+        
+        {/* PREMIUM COMMAND HEADER */}
+        <section className="mb-8 overflow-hidden rounded-[2rem] border border-slate-200 bg-white/80 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-2xl dark:border-white/10 dark:bg-white/5 dark:shadow-none">
+          <div className="flex flex-col items-center gap-6 text-center md:flex-row md:text-left">
+            <div className="relative h-20 w-20 shrink-0">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="User" className="h-full w-full rounded-full object-cover shadow-inner" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-3xl font-bold text-white shadow-lg">
+                  {user?.displayName?.[0]?.toUpperCase() || "S"}
+                </div>
+              )}
+              <div className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-4 border-white bg-emerald-500 dark:border-[#030712]"></div>
+            </div>
+            
+            <div className="flex-1">
+              <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                {user?.displayName || "Student Command Center"}
               </h1>
-              <p className="text-muted text-sm">{user?.email}</p>
-              <div className="mt-2 flex gap-2">
-                {providers.google ? <span className="provider-google rounded-full px-2 py-0.5 text-xs font-mono">Google</span> : null}
-                {providers.github ? <span className="provider-github rounded-full px-2 py-0.5 text-xs font-mono">GitHub</span> : null}
-                {providers.email ? <span className="provider-email rounded-full px-2 py-0.5 text-xs font-mono">Email</span> : null}
+              <p className="mt-1 text-slate-500 dark:text-slate-400">{user?.email}</p>
+              <div className="mt-3 flex justify-center gap-2 md:justify-start">
+                {providers.google && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">Google Auth</span>}
+                {providers.github && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">GitHub Auth</span>}
               </div>
+            </div>
+
+            <div className="shrink-0">
+              <VoiceMentorButton />
             </div>
           </div>
         </section>
 
-        <div className="mb-4 flex flex-wrap gap-2">
+        {/* HORIZONTAL SCROLL TABS */}
+        <div className="no-scrollbar mb-8 flex gap-3 overflow-x-auto pb-2">
           {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium ${activeTab === tab
-                  ? "bg-blue-600 text-white"
-                  : "border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
-                }`}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex shrink-0 items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${
+                activeTab === tab.id
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10"
+              }`}
             >
-              {tab === "profile"
-                ? "Profile"
-                : tab === "saved"
-                  ? "Saved Jobs"
-                  : tab === "prep"
-                    ? "Interview Prep"
-                    : "Applications Tracker"}
+              <span>{tab.icon}</span> {tab.label}
             </button>
           ))}
         </div>
 
-        {error ? (
-          <div className="mb-4 rounded-xl border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-400">
+        {error && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
             {error}
-          </div>
-        ) : null}
+          </motion.div>
+        )}
 
-        {activeTab === "profile" ? (
-          <section className="section-shell p-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <input
-                value={form.githubUrl}
-                onChange={(event) => setForm((current) => ({ ...current, githubUrl: event.target.value }))}
-                placeholder="GitHub URL"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-              />
-              <input
-                value={form.portfolioUrl}
-                onChange={(event) => setForm((current) => ({ ...current, portfolioUrl: event.target.value }))}
-                placeholder="Portfolio URL"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-              />
-              <input
-                value={form.resumeUrl}
-                onChange={(event) => setForm((current) => ({ ...current, resumeUrl: event.target.value }))}
-                placeholder="Resume URL"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-              />
-              <input
-                value={form.location.city}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    location: { ...current.location, city: event.target.value },
-                  }))
-                }
-                placeholder="City"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-              />
-              <input
-                value={form.location.state}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    location: { ...current.location, state: event.target.value },
-                  }))
-                }
-                placeholder="State"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-              />
-              <input
-                value={form.location.country}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    location: { ...current.location, country: event.target.value },
-                  }))
-                }
-                placeholder="Country"
-                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-              />
-            </div>
-            <textarea
-              value={form.bio}
-              onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))}
-              placeholder="Short bio"
-              rows={4}
-              className="mt-4 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-            />
+        {/* TAB CONTENT WITH ANIMATIONS */}
+        <AnimatePresence mode="wait">
+          
+          {/* IDENTITY TAB */}
+          {activeTab === "profile" && (
+            <motion.section key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid gap-6 lg:grid-cols-3">
+              <div className="rounded-[2rem] border border-slate-200 bg-white/60 p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/5 lg:col-span-2">
+                <h2 className="mb-6 text-xl font-bold text-slate-900 dark:text-white">Professional Links</h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <input value={form.githubUrl} onChange={(e) => setForm({ ...form, githubUrl: e.target.value })} placeholder="GitHub URL" className={inputClass} />
+                  <input value={form.portfolioUrl} onChange={(e) => setForm({ ...form, portfolioUrl: e.target.value })} placeholder="Portfolio URL" className={inputClass} />
+                  <input value={form.resumeUrl} onChange={(e) => setForm({ ...form, resumeUrl: e.target.value })} placeholder="Resume Link (PDF)" className={`md:col-span-2 ${inputClass}`} />
+                </div>
+                
+                <h2 className="mb-4 mt-8 text-xl font-bold text-slate-900 dark:text-white">Location Details</h2>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <input value={form.location.city} onChange={(e) => setForm({ ...form, location: { ...form.location, city: e.target.value } })} placeholder="City" className={inputClass} />
+                  <input value={form.location.state} onChange={(e) => setForm({ ...form, location: { ...form.location, state: e.target.value } })} placeholder="State" className={inputClass} />
+                  <input value={form.location.country} onChange={(e) => setForm({ ...form, location: { ...form.location, country: e.target.value } })} placeholder="Country" className={inputClass} />
+                </div>
 
-            <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
-              <p className="mb-2 text-sm text-zinc-400">Skills</p>
-              <div className="mb-2 flex flex-wrap gap-2">
-                {form.skills.map((skill) => (
-                  <button
-                    type="button"
-                    key={skill}
-                    onClick={() => removeSkill(skill)}
-                    className="rounded-full border border-blue-800 bg-blue-950 px-2 py-1 text-xs text-blue-300"
-                  >
-                    {skill} x
-                  </button>
-                ))}
+                <h2 className="mb-4 mt-8 text-xl font-bold text-slate-900 dark:text-white">About Me</h2>
+                <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Briefly describe your tech journey..." rows={4} className={inputClass} />
               </div>
-              <div className="flex gap-2">
-                <input
-                  value={skillInput}
-                  onChange={(event) => setSkillInput(event.target.value)}
-                  placeholder="Add skill"
-                  className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-blue-500"
-                />
-                <button
-                  type="button"
-                  onClick={addSkill}
-                  className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={saveProfile}
-              disabled={savingProfile}
-              className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
-            >
-              {savingProfile ? "Saving..." : "Save Profile"}
-            </button>
-          </section>
-        ) : null}
+              {/* SKILLS BENTO BOX */}
+              <div className="h-fit rounded-[2rem] border border-slate-200 bg-white/60 p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
+                <h2 className="mb-4 text-xl font-bold text-slate-900 dark:text-white">Skill Cloud</h2>
+                <div className="mb-6 flex flex-wrap gap-2">
+                  <AnimatePresence>
+                    {form.skills.map((skill) => (
+                      <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} key={skill} onClick={() => removeSkill(skill)} className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-red-50 hover:text-red-600 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-red-500/20 dark:hover:text-red-400">
+                        {skill} <span>×</span>
+                      </motion.button>
+                    ))}
+                  </AnimatePresence>
+                </div>
+                <div className="flex gap-2">
+                  <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSkill()} placeholder="E.g. React, Node.js" className={inputClass} />
+                  <button onClick={addSkill} className="rounded-2xl bg-slate-900 px-6 font-bold text-white transition-transform hover:scale-105 dark:bg-white dark:text-slate-900">Add</button>
+                </div>
 
-        {activeTab === "saved" ? (
-          <section className="section-shell p-6">
-            {savedJobs.length === 0 ? (
-              <p className="text-sm text-zinc-400">No saved jobs yet. Browse internships -&gt;</p>
-            ) : (
-              <div className="space-y-3">
-                {savedJobs.map((entry) => (
-                  <div key={entry.jobId} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-zinc-100">{entry.jobData?.title}</p>
-                        <p className="text-sm text-zinc-500">{entry.jobData?.company}</p>
-                      </div>
-                      <span className={`rounded-full px-2 py-1 text-xs ${statusStyles[entry.status]}`}>
-                        {entry.status}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <select
-                        value={entry.status}
-                        onChange={(event) => updateStatus(entry.jobId, event.target.value)}
-                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 outline-none"
-                      >
-                        {statusOrder.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => unsave(entry.jobId)}
-                        className="rounded-lg border border-red-900 bg-red-950 px-3 py-1.5 text-xs text-red-300"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-        {activeTab === "prep" ? (
-          <section className="section-shell p-6">
-            <VoiceMentorButton />
-            {groupedQuestions.length === 0 ? (
-              <p className="text-sm text-zinc-400">No AI interview questions yet. Save jobs with AI analysis first.</p>
-            ) : (
-              <div className="space-y-4">
-                {groupedQuestions.map((group) => (
-                  <div key={group.company} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-                    <p className="font-medium text-zinc-100">{group.company}</p>
-                    <ul className="mt-2 space-y-2">
-                      {group.questions.map((question, index) => (
-                        <li key={`${group.company}-${index}`} className="flex items-start justify-between gap-2 text-sm text-zinc-300">
-                          <span>{question}</span>
-                          <button
-                            type="button"
-                            onClick={() => navigator.clipboard.writeText(question)}
-                            className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-                          >
-                            Copy
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-        {activeTab === "tracker" ? (
-          <section className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory md:grid md:grid-cols-5 md:overflow-visible md:pb-0">
-            {statusOrder.map((status) => (
-              <div
-                key={status}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  const jobId = event.dataTransfer.getData("text/job-id");
-                  if (jobId) updateStatus(jobId, status);
-                }}
-                className="w-80 min-w-[300px] snap-center shrink-0 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50/50 dark:bg-zinc-900/40 p-4 shadow-sm backdrop-blur-md md:w-auto md:min-w-0"
-              >
-                <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-300 flex items-center gap-2">
-                  <div className={`w-2.5 h-2.5 rounded-full ${status === 'accepted' ? 'bg-emerald-500' : status === 'rejected' ? 'bg-red-500' : status === 'interviewing' ? 'bg-amber-500' : 'bg-blue-500'}`}></div>
-                  {status}
-                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 dark:bg-zinc-800 text-[10px] text-slate-600 dark:text-zinc-400">
-                    {(kanban[status] || []).length}
-                  </span>
-                </h3>
-                <div className="space-y-3">
-                  {(kanban[status] || []).map((entry) => (
-                    <div
-                      key={`${status}-${entry.jobId}`}
-                      draggable
-                      onDragStart={(event) => event.dataTransfer.setData("text/job-id", entry.jobId)}
-                      className="cursor-grab rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-zinc-950/70 p-3 text-sm shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
-                    >
-                      <p className="font-semibold text-slate-900 dark:text-zinc-100 line-clamp-1">{entry.jobData?.title}</p>
-                      <p className="text-slate-600 dark:text-zinc-400 mt-0.5 line-clamp-1">{entry.jobData?.company}</p>
-                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 dark:border-zinc-800/50 pt-2">
-                        <p className="text-[11px] font-medium text-slate-500 dark:text-zinc-500">
-                          {new Date(entry.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </p>
-                        <span className="text-[10px] font-mono text-zinc-400">Drag ⠿</span>
-                      </div>
-                    </div>
-                  ))}
-                  {(kanban[status] || []).length === 0 && (
-                    <div className="rounded-xl border border-dashed border-slate-300 dark:border-zinc-700/50 py-6 text-center">
-                      <p className="text-xs text-slate-400 dark:text-zinc-500">Drop here</p>
-                    </div>
-                  )}
+                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/10">
+                   <button onClick={saveProfile} disabled={savingProfile} className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-600/20 transition-transform hover:scale-[1.02] disabled:opacity-50">
+                     {savingProfile ? "Syncing to Database..." : "Save Complete Profile"}
+                   </button>
                 </div>
               </div>
-            ))}
-          </section>
-        ) : null}
+            </motion.section>
+          )}
+
+          {/* SAVED LIST TAB */}
+          {activeTab === "saved" && (
+            <motion.section key="saved" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {savedJobs.length === 0 ? (
+                <p className="col-span-full py-12 text-center text-slate-500 dark:text-slate-400">No saved jobs yet. Head to the Feed to discover opportunities.</p>
+              ) : (
+                savedJobs.map((entry) => (
+                  <div key={entry.jobId} className="group rounded-[2rem] border border-slate-200 bg-white/60 p-6 shadow-sm backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-white/5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{entry.jobData?.title}</h3>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{entry.jobData?.company}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${statusStyles[entry.status]}`}>{entry.status}</span>
+                    </div>
+                    <div className="mt-6 flex gap-2 border-t border-slate-200 pt-4 dark:border-white/10">
+                      <select value={entry.status} onChange={(e) => updateStatus(entry.jobId, e.target.value)} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 outline-none dark:border-white/10 dark:bg-black/20 dark:text-slate-300">
+                        {statusOrder.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                      </select>
+                      <button onClick={() => unsave(entry.jobId)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20">Remove</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </motion.section>
+          )}
+
+          {/* AI PREP TAB */}
+          {activeTab === "prep" && (
+            <motion.section key="prep" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+              {groupedQuestions.length === 0 ? (
+                <div className="rounded-[2rem] border border-dashed border-slate-300 py-20 text-center dark:border-white/10">
+                  <p className="text-slate-500 dark:text-slate-400">Save jobs from the Smart Feed to generate AI interview questions.</p>
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  {groupedQuestions.map((group) => (
+                    <div key={group.company} className="rounded-[2rem] border border-slate-200 bg-white/60 p-8 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
+                      <h3 className="mb-6 text-xl font-extrabold text-slate-900 dark:text-white">{group.company} Insights</h3>
+                      <ul className="space-y-4">
+                        {group.questions.map((question, idx) => (
+                          <li key={idx} className="group relative rounded-2xl bg-slate-50 p-4 pr-16 text-sm text-slate-700 dark:bg-black/20 dark:text-slate-300">
+                            <span className="absolute left-4 top-4 font-mono text-blue-500">Q.</span>
+                            <span className="ml-6 block">{question}</span>
+                            <button onClick={() => navigator.clipboard.writeText(question)} className="absolute right-4 top-4 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold uppercase text-slate-400 opacity-0 transition-all hover:text-blue-600 group-hover:opacity-100 dark:border-white/10 dark:bg-zinc-800">Copy</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.section>
+          )}
+
+          {/* KANBAN TRACKER TAB */}
+          {activeTab === "tracker" && (
+            <motion.section key="tracker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex snap-x snap-mandatory gap-6 overflow-x-auto pb-8 md:grid md:grid-cols-5 md:overflow-visible md:pb-0 no-scrollbar">
+              {statusOrder.map((status) => (
+                <div key={status} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { const id = e.dataTransfer.getData("jobId"); if (id) updateStatus(id, status); }} className="w-[85vw] min-w-[300px] shrink-0 snap-center rounded-[2rem] border border-slate-200 bg-slate-100/50 p-4 dark:border-white/5 dark:bg-white/5 md:w-auto md:min-w-0">
+                  <h3 className="mb-6 flex items-center justify-between px-2 text-xs font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-2">
+                      <div className={`h-2.5 w-2.5 rounded-full ${status === 'accepted' ? 'bg-emerald-500' : status === 'rejected' ? 'bg-red-500' : status === 'interviewing' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                      {status}
+                    </span>
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-slate-600 dark:bg-white/10 dark:text-slate-300">{(kanban[status] || []).length}</span>
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <AnimatePresence>
+                      {(kanban[status] || []).map((entry) => (
+                        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} key={entry.jobId} draggable onDragStart={(e) => e.dataTransfer.setData("jobId", entry.jobId)} className="group cursor-grab rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-blue-400 hover:shadow-md active:cursor-grabbing dark:border-white/10 dark:bg-[#0f172a] dark:hover:border-blue-500/50">
+                          <p className="font-bold text-slate-900 line-clamp-1 dark:text-white">{entry.jobData?.title}</p>
+                          <p className="mt-1 text-xs text-slate-500 line-clamp-1 dark:text-slate-400">{entry.jobData?.company}</p>
+                          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-white/5">
+                            <span className="text-[10px] font-semibold text-slate-400">Saved {new Date(entry.savedAt).toLocaleDateString()}</span>
+                            <span className="text-[10px] font-mono text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-600">Drag ⠿</span>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                    {(kanban[status] || []).length === 0 && (
+                      <div className="rounded-2xl border-2 border-dashed border-slate-200 py-8 text-center dark:border-white/5">
+                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-600">Drop item here</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </motion.section>
+          )}
+        </AnimatePresence>
       </div>
     </main>
   );

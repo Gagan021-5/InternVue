@@ -126,7 +126,7 @@ export default function RegisterPage() {
       <div className="mx-auto w-full max-w-md p-4 md:p-8">
         <div className="section-shell p-6 shadow-2xl md:p-8">
           <p className="font-display text-xl font-bold text-blue-500 md:text-2xl">InternVue</p>
-          <h1 className="text-main mt-2 font-display text-2xl font-semibold md:text-3xl">Create your account</h1>
+          <h1 className="mt-2 font-display text-2xl font-semibold text-slate-900 dark:text-white md:text-3xl">Create your account</h1>
 
           {socialError ? (
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-400">

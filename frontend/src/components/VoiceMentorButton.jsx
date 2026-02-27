@@ -298,11 +298,11 @@ export default function VoiceMentorButton() {
   };
 
   return (
-    <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+    <section className="section-shell mb-6 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-zinc-100">AI Mentor Voice</p>
-          <p className="text-xs text-zinc-400">{status}</p>
+          <p className="text-sm font-medium text-main">AI Mentor Voice</p>
+          <p className="text-xs text-muted">{status}</p>
         </div>
         <button
           type="button"
@@ -315,8 +315,8 @@ export default function VoiceMentorButton() {
             isRecording
               ? "bg-red-600 text-white"
               : isProcessing
-                ? "cursor-not-allowed bg-zinc-700 text-zinc-300"
-                : "bg-blue-600 text-white hover:bg-blue-500"
+                ? "btn-secondary cursor-not-allowed opacity-70"
+                : "btn-primary"
           }`}
         >
           {isRecording ? "Release to Send" : isProcessing ? "Processing..." : "Hold to Talk"}

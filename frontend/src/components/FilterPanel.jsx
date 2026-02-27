@@ -35,7 +35,7 @@ export default function FilterPanel({ onFilterChange }) {
 
   return (
     <aside className="section-shell p-4">
-      <h3 className="font-display text-lg font-semibold text-main">Filters</h3>
+      <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Filters</h3>
       <div className="mt-4 space-y-3 text-sm">
         <label className="flex items-center gap-2 text-soft">
           <input
@@ -72,14 +72,12 @@ export default function FilterPanel({ onFilterChange }) {
           onClick={() =>
             setFilters((current) => ({ ...current, verifiedOnly: !current.verifiedOnly }))
           }
-          className={`relative h-6 w-11 rounded-full transition ${
-            filters.verifiedOnly ? "bg-blue-600" : "bg-slate-400"
-          }`}
+          className={`relative h-6 w-11 rounded-full transition ${filters.verifiedOnly ? "bg-blue-600" : "bg-slate-400"
+            }`}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
-              filters.verifiedOnly ? "left-[22px]" : "left-0.5"
-            }`}
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${filters.verifiedOnly ? "left-[22px]" : "left-0.5"
+              }`}
           />
         </button>
       </div>
@@ -92,11 +90,10 @@ export default function FilterPanel({ onFilterChange }) {
               key={tag}
               type="button"
               onClick={() => toggleTag(tag)}
-              className={`rounded-full border px-2.5 py-1 text-xs ${
-                filters.tags.includes(tag)
+              className={`rounded-full border px-2.5 py-1 text-xs ${filters.tags.includes(tag)
                   ? "chip-active"
                   : "chip-neutral"
-              }`}
+                }`}
             >
               {tag}
             </button>

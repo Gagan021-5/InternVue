@@ -1,159 +1,233 @@
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import Navbar from "../components/Navbar";
+import { useAuthContext } from "../context/AuthContext";
 
-const bentoCardClass = "relative overflow-hidden rounded-3xl border border-slate-200/50 dark:border-white/5 bg-white/60 dark:bg-white/5 p-8 shadow-xl shadow-slate-200/40 dark:shadow-none backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-slate-300 dark:hover:border-white/10";
-const impactCardClass = "rounded-3xl border border-slate-200/50 dark:border-white/5 bg-white/60 dark:bg-white/5 p-6 shadow-lg shadow-slate-200/30 dark:shadow-none backdrop-blur-lg transition-all hover:-translate-y-1 hover:border-slate-300 dark:hover:border-white/10";
+/* ── Animation Variants ─────────────────────────────────────────────────── */
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 24 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-60px" },
+  transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1], delay },
+});
+
+/* ── Stat data ──────────────────────────────────────────────────────────── */
+const STATS = [
+  { value: "900+", label: "Live Internships" },
+  { value: "AI", label: "Powered Analysis" },
+  { value: "100%", label: "Verified Authenticity" },
+];
+
+/* ── Bento feature cards ────────────────────────────────────────────────── */
+const FEATURES = [
+  {
+    col: "md:col-span-2 lg:col-span-1",
+    accent: "from-blue-500/20 to-cyan-400/5",
+    icon: (
+      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    iconBg: "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400",
+    title: "Verified Authenticity",
+    body:
+      "Every listing is filtered by AI to block fake, senior-level, and misclassified roles. You only see genuine internship-ready opportunities.",
+  },
+  {
+    col: "md:col-span-2 lg:col-span-1",
+    accent: "from-indigo-500/15 to-violet-400/5",
+    icon: (
+      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+      </svg>
+    ),
+    iconBg: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400",
+    title: "AI Career Readiness",
+    body:
+      "Gemini-powered analysis surfaces personalized interview questions and skill-gap insights so you walk into every application prepared.",
+  },
+  {
+    col: "md:col-span-4 lg:col-span-1",
+    accent: "from-cyan-500/15 to-teal-400/5",
+    icon: (
+      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+      </svg>
+    ),
+    iconBg: "bg-cyan-50 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-400",
+    title: "Direct Connections",
+    body:
+      "Each role links directly to the application — no agency walls, no hidden redirects. Local startup gems alongside curated global listings.",
+  },
+];
+
+/* ── Impact rows ────────────────────────────────────────────────────────── */
+const IMPACT = [
+  { icon: "📊", title: "Real-time Pipeline Tracker", body: "Kanban board with drag-and-drop cards. Move applications from Saved → Applied → Interviewing without leaving your dashboard." },
+  { icon: "🌏", title: "Global & Local Pipeline", body: "Live Adzuna feed from 900+ global firms merged with hand-curated local startup roles. Searchable, filterable, and always fresh." },
+  { icon: "✍️", title: "AI Outreach Drafts", body: "One-click Gemini-generated cover letters personalised to the job and your profile. Edit and send in under two minutes." },
+];
 
 export default function HomePage() {
+  const { isAuthenticated } = useAuthContext();
+  const feedDestination = isAuthenticated ? "/feed" : "/login";
+
   return (
     <main className="app-bg relative min-h-screen overflow-hidden">
-      {/* Background ambient glows */}
-      <div className="pointer-events-none absolute -left-[20%] -top-[10%] h-[500px] w-[500px] rounded-full bg-blue-500/20 blur-[120px]" />
-      <div className="pointer-events-none absolute -right-[10%] top-[20%] h-[400px] w-[400px] rounded-full bg-cyan-400/20 blur-[100px]" />
+      {/* ── Ambient background glows ──────────────────────────────────── */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-[20%] -top-[10%] h-[600px] w-[600px] rounded-full bg-blue-500/[0.12] blur-[140px] dark:bg-blue-500/[0.08]" />
+        <div className="absolute -right-[10%] top-[20%]  h-[500px] w-[500px] rounded-full bg-cyan-400/[0.10] blur-[120px] dark:bg-cyan-400/[0.06]" />
+        <div className="absolute bottom-[10%]  left-[30%]  h-[400px] w-[400px] rounded-full bg-indigo-500/[0.08] blur-[100px] dark:bg-indigo-500/[0.05]" />
+      </div>
 
       <Navbar />
 
-      <div className="mx-auto max-w-7xl space-y-20 px-6 py-12 md:py-20 lg:px-8">
+      <div className="relative mx-auto max-w-7xl space-y-24 px-6 py-16 md:py-24 lg:px-8">
 
-        {/* HERO SECTION */}
-        <section className="relative overflow-hidden rounded-[3rem] border border-slate-200/50 dark:border-white/10 bg-white/40 dark:bg-zinc-950/40 p-1 shadow-2xl shadow-slate-300/30 dark:shadow-black/50 backdrop-blur-3xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-cyan-400/10" />
-          <div className="relative rounded-[2.8rem] bg-white/60 dark:bg-zinc-950/60 px-6 py-20 text-center md:px-16 md:py-32">
-            <div className="mx-auto max-w-4xl">
-              <span className="inline-block rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-4 py-1.5 text-sm font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase">
-                InternVue Platform
-              </span>
-              <h1 className="mt-8 font-display text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-5xl md:text-6xl lg:text-7xl">
-                The Internship Hub Built for <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">Professional Outcomes.</span>
-              </h1>
-              <p className="mx-auto mt-8 max-w-2xl text-lg text-slate-600 dark:text-slate-400 md:text-xl">
-                InternVue combines verified local startup internships with trusted global opportunities,
-                giving students a single environment to discover, evaluate, and act with absolute confidence.
-              </p>
-              <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <Link to="/feed" className="flex items-center gap-2 rounded-2xl bg-blue-600 px-8 py-4 text-base font-bold text-white shadow-xl shadow-blue-500/30 transition-all hover:-translate-y-1 hover:bg-blue-500 hover:shadow-blue-500/40">
-                  Browse Opportunities
-                  <span aria-hidden="true">&rarr;</span>
-                </Link>
-                <Link to="/register" className="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-8 py-4 text-base font-bold text-slate-700 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-white/10">
-                  Create Account
-                </Link>
-              </div>
-            </div>
+        {/* ══ HERO ════════════════════════════════════════════════════════ */}
+        <motion.section {...fadeUp(0)} className="text-center">
+          {/* Platform badge */}
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/70 bg-blue-50 px-4 py-1.5 dark:border-blue-500/20 dark:bg-blue-500/10">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+            <span className="label-tag text-blue-600 dark:text-blue-400">InternVue Platform · Live</span>
           </div>
-        </section>
 
-        {/* BENTO GRID (User-Centric Advantage) */}
-        <section className="relative z-10">
-          <div className="text-center">
-            <span className="text-sm font-bold tracking-widest text-blue-500 uppercase">User-Centric Advantage</span>
-            <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+          {/* Heading */}
+          <h1 className="mx-auto mt-8 max-w-4xl text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-6xl md:text-7xl">
+            The Internship Hub Built for{" "}
+            <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent dark:from-blue-400 dark:to-cyan-400">
+              Professional Outcomes.
+            </span>
+          </h1>
+
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-500 dark:text-slate-400 md:text-xl">
+            Verified listings. AI-powered analysis. Real pipeline tracking.
+            InternVue gives you every advantage — from discovery to offer letter.
+          </p>
+
+          {/* CTA buttons */}
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              to={feedDestination}
+              className="btn-primary group inline-flex items-center gap-2 px-8 py-4 text-base shadow-xl shadow-blue-500/20"
+            >
+              Browse Opportunities
+              <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+            </Link>
+            <Link
+              to="/register"
+              className="btn-secondary inline-flex items-center gap-2 px-8 py-4 text-base"
+            >
+              Create Account
+            </Link>
+          </div>
+
+          {/* Stat pills */}
+          <div className="mt-14 flex flex-wrap items-center justify-center gap-6">
+            {STATS.map((s) => (
+              <div key={s.label} className="flex flex-col items-center">
+                <span className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">{s.value}</span>
+                <span className="label-tag mt-0.5 text-slate-500 dark:text-slate-500">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </motion.section>
+
+        {/* ══ BENTO FEATURE GRID ══════════════════════════════════════════ */}
+        <motion.section {...fadeUp(0.05)}>
+          <div className="mb-12 text-center">
+            <span className="label-tag text-blue-500">User-Centric Advantage</span>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
               Purpose-built for verified discovery.
             </h2>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <article className={`${bentoCardClass} md:col-span-2 lg:col-span-1`}>
-              <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-500/20 blur-3xl" />
-              <div className="relative z-10">
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Verified Authenticity</h3>
-                <p className="mt-4 leading-relaxed text-slate-600 dark:text-slate-400">
-                  InternVue actively blocks fake, senior-level, and misclassified listings so students
-                  focus only on real internship-ready roles.
-                </p>
-              </div>
-            </article>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-4 lg:grid-cols-3">
+            {FEATURES.map((f, i) => (
+              <motion.article
+                key={f.title}
+                {...fadeUp(i * 0.07)}
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                className={`group relative overflow-hidden rounded-[2rem] border border-slate-200/60 bg-white/60 p-8 shadow-sm backdrop-blur-xl transition-shadow hover:shadow-xl hover:shadow-slate-200/60 dark:border-white/8 dark:bg-white/[0.04] dark:hover:shadow-none ${f.col}`}
+              >
+                {/* Card accent glow */}
+                <div className={`pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-gradient-to-br ${f.accent} blur-3xl`} />
 
-            <article className={`${bentoCardClass} md:col-span-2 lg:col-span-1`}>
-              <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-cyan-400/20 blur-3xl" />
-              <div className="relative z-10">
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
+                <div className="relative z-10">
+                  <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-2xl ${f.iconBg}`}>
+                    {f.icon}
+                  </div>
+                  <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{f.title}</h3>
+                  <p className="mt-4 leading-relaxed text-slate-500 dark:text-slate-400">{f.body}</p>
                 </div>
-                <h3 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Career Readiness</h3>
-                <p className="mt-4 leading-relaxed text-slate-600 dark:text-slate-400">
-                  AI guidance surfaces interview preparation prompts, highlights skill gaps, and helps
-                  students prepare strategically before applying.
-                </p>
-              </div>
-            </article>
-
-            <article className={`${bentoCardClass} lg:col-span-1`}>
-              <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-indigo-500/20 blur-3xl" />
-              <div className="relative z-10">
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-                <h3 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Direct Connections</h3>
-                <p className="mt-4 leading-relaxed text-slate-600 dark:text-slate-400">
-                  Students connect directly with verified local startups and access clear application
-                  paths without noisy, irrelevant detours.
-                </p>
-              </div>
-            </article>
+              </motion.article>
+            ))}
           </div>
-        </section>
+        </motion.section>
 
-        {/* WHY IT MATTERS - IMPACT CARDS */}
-        <section className="relative z-10 pt-10">
-          <div className="text-center">
-            <span className="text-sm font-bold tracking-widest text-blue-500 uppercase">Platform Impact</span>
-            <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+        {/* ══ IMPACT SECTION ══════════════════════════════════════════════ */}
+        <motion.section {...fadeUp(0.05)}>
+          <div className="mb-12 text-center">
+            <span className="label-tag text-blue-500">Platform Impact</span>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
               Engineered for student success.
             </h2>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-            <article className={impactCardClass}>
-              <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">Real-time Application Tracking.</h3>
-              <p className="mt-3 leading-relaxed text-slate-600 dark:text-slate-400">
-                Every saved role and status update stays visible, measurable, and easy to manage right inside your dashboard.
-              </p>
-            </article>
-            <article className={impactCardClass}>
-              <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">Global &amp; Local Pipeline.</h3>
-              <p className="mt-3 leading-relaxed text-slate-600 dark:text-slate-400">
-                Gain balanced access to exclusive verified local openings alongside high-quality global roles from Adzuna.
-              </p>
-            </article>
-            <article className={impactCardClass}>
-              <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">Apply Anywhere.</h3>
-              <p className="mt-3 leading-relaxed text-slate-600 dark:text-slate-400">
-                Our mobile-first, responsive design ensures a consistent, professional experience from login to application submission.
-              </p>
-            </article>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            {IMPACT.map((item, i) => (
+              <motion.div
+                key={item.title}
+                {...fadeUp(i * 0.08)}
+                whileHover={{ y: -3, transition: { duration: 0.18 } }}
+                className="rounded-[2rem] border border-slate-200/60 bg-white/60 p-8 backdrop-blur-xl transition-shadow hover:shadow-lg hover:shadow-slate-200/40 dark:border-white/8 dark:bg-white/[0.04]"
+              >
+                <span className="text-3xl">{item.icon}</span>
+                <h3 className="mt-4 text-lg font-bold tracking-tight text-slate-900 dark:text-white">{item.title}</h3>
+                <p className="mt-3 leading-relaxed text-slate-500 dark:text-slate-400">{item.body}</p>
+              </motion.div>
+            ))}
           </div>
-        </section>
+        </motion.section>
 
-        {/* CTA SECTION */}
-        <section className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-blue-600 to-indigo-700 px-6 py-24 text-center shadow-2xl shadow-blue-500/20 md:px-16 md:py-32">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
-          <div className="relative z-10 mx-auto max-w-3xl">
-            <h2 className="font-display text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
-              Ready to launch your career?
-            </h2>
-            <p className="mx-auto mt-6 max-w-xl text-lg text-blue-100/90 md:text-xl">
-              Join InternVue today and start building your future with a platform dedicated to your professional journey.
-            </p>
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link to="/feed" className="rounded-2xl bg-white px-8 py-4 text-base font-bold text-blue-600 shadow-xl transition-all hover:scale-105 hover:bg-slate-50">
-                Explore Jobs Now
-              </Link>
-              <Link to="/dashboard" className="rounded-2xl border border-white/20 bg-white/10 px-8 py-4 text-base font-bold text-white backdrop-blur-md transition-all hover:bg-white/20">
-                Open Dashboard
-              </Link>
+        {/* ══ CTA BANNER ═════════════════════════════════════════════════ */}
+        <motion.section {...fadeUp(0.05)}>
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 px-8 py-20 text-center shadow-2xl shadow-blue-500/25 md:px-16 md:py-28">
+            {/* Dot texture overlay */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.06]"
+              style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "20px 20px" }}
+            />
+            {/* Glow orb */}
+            <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 -translate-y-1/3 rounded-full bg-white/10 blur-[80px]" />
+
+            <div className="relative z-10 mx-auto max-w-3xl">
+              <span className="label-tag text-blue-200">Ready to launch?</span>
+              <h2 className="mt-4 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+                Your next opportunity starts here.
+              </h2>
+              <p className="mx-auto mt-5 max-w-xl text-lg text-blue-100/80">
+                Join thousands of students using InternVue to find, track, and land their first professional role.
+              </p>
+              <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <Link
+                  to={feedDestination}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-blue-600 shadow-xl transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95"
+                >
+                  Explore Jobs Now →
+                </Link>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-8 py-4 text-base font-bold text-white backdrop-blur-md transition-all hover:bg-white/20 active:scale-95"
+                >
+                  Create Free Account
+                </Link>
+              </div>
             </div>
           </div>
-        </section>
+        </motion.section>
 
       </div>
     </main>

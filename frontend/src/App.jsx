@@ -23,7 +23,14 @@ export default function App() {
     <ErrorBoundary>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/feed" element={<FeedPage />} />
+        <Route
+          path="/feed"
+          element={
+            <ProtectedRoute>
+              <FeedPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route

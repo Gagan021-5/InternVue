@@ -54,7 +54,14 @@ export default function StudentDashboard() {
         location: { city: p?.location?.city || "", state: p?.location?.state || "", country: p?.location?.country || "" },
       });
     } catch (err) {
-      setError(err.response?.data?.error || "Could not load dashboard.");
+      const isTimeout = err.code === "ECONNABORTED" || err.message?.includes("timeout");
+      const isNetworkError = !err.response;
+      setError(
+        err.response?.data?.error ||
+        (isTimeout || isNetworkError
+          ? "Server is waking up — please wait a moment and refresh."
+          : "Could not load dashboard.")
+      );
     } finally {
       setLoading(false);
     }
@@ -181,8 +188,8 @@ export default function StudentDashboard() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex shrink-0 items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10"
                 }`}
             >
               <span>{tab.icon}</span> {tab.label}

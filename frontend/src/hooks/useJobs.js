@@ -34,7 +34,14 @@ export default function useJobs({ location = "", role = "", radius = "", page = 
       if (axios.isCancel(requestError) || requestError.name === "CanceledError") {
         return;
       }
-      const message = requestError.response?.data?.error || "Failed to fetch jobs.";
+      // Distinguish cold-start timeout from a real server error
+      const isTimeout = requestError.code === "ECONNABORTED" || requestError.message?.includes("timeout");
+      const isNetworkError = !requestError.response;
+      const message =
+        requestError.response?.data?.error ||
+        (isTimeout || isNetworkError
+          ? "Server is waking up — please wait a moment and refresh."
+          : "Failed to fetch jobs.");
       setError(message);
     } finally {
       setLoading(false);

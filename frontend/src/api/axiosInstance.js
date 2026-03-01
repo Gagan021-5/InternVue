@@ -3,7 +3,7 @@ import { auth } from "../firebase/firebase";
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000",
-  timeout: 15000,
+  timeout: 45000, // Render free tier can take 30-50s to cold start
 });
 
 axiosInstance.interceptors.request.use(

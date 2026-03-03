@@ -103,7 +103,10 @@ export const generateSpeech = async (req, res) => {
       return res.status(400).json({ error: "Text is required" });
     }
 
-    const VOICE_ID = process.env.ELEVENLABS_TTS_VOICE_ID || "pNInz6obpgDQGcFmaJcg"; // Default: Adam
+    const VOICE_ID =
+      process.env.ELEVENLABS_TTS_VOICE_ID ||
+      process.env.ELEVENLABS_MENTOR_VOICE_ID ||
+      "pNInz6obpgDQGcFmaJcg";
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
     if (!ELEVENLABS_API_KEY) {
@@ -145,4 +148,3 @@ export const generateSpeech = async (req, res) => {
     });
   }
 };
-

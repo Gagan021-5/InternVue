@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
-const required = ["MONGO_URI", "ADZUNA_APP_ID", "ADZUNA_APP_KEY", "GEMINI_API_KEY", "ELEVENLABS_API_KEY"];
+const required = ["MONGO_URI", "ADZUNA_APP_ID", "ADZUNA_APP_KEY", "GEMINI_API_KEY", "ELEVENLABS_API_KEY", "JSEARCH_API_KEY"];
 required.forEach((key) => {
   if (!process.env[key]) console.warn(`Missing env var: ${key}`);
 });
@@ -24,7 +24,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:3000","https://internvue.onrender.com"],
+    origin: ["http://localhost:5173", "http://localhost:3000", "https://internvue.onrender.com"],
     credentials: true,
   })
 );

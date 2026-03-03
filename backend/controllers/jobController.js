@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import Job from "../models/Job.js";
 import { applyAuthenticityFilter } from "../middleware/authenticityFilter.js";
 import { analyzeJobWithGemini } from "../services/geminiService.js";
+import { enrichJobWithAI } from "../services/aiService.js";
+import { fetchJSearchJobs } from "../services/jsearchService.js";
 
 const parsePositiveInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
@@ -156,203 +158,153 @@ const fetchAdzunaPages = async ({
   return collected;
 };
 
-const upsertAdzunaJobs = async (adzunaJobs = []) => {
-  if (!Array.isArray(adzunaJobs) || adzunaJobs.length === 0) {
-    return { fetched: 0, upserted: 0, modified: 0, matched: 0 };
-  }
-
-  const deduped = new Map();
-  for (const adzunaJob of adzunaJobs) {
-    if (!adzunaJob?.id) continue;
-    const normalized = normalizeAdzunaJobForDb(adzunaJob);
-    deduped.set(normalized.externalId, normalized);
-  }
-
-  if (deduped.size === 0) {
-    return { fetched: adzunaJobs.length, upserted: 0, modified: 0, matched: 0 };
-  }
-
-  const operations = [...deduped.values()].map((job) => ({
-    updateOne: {
-      filter: {
-        source: "adzuna",
-        $or: [
-          { externalId: job.externalId },
-          { applyUrl: job.applyUrl }
-        ]
-      },
-      update: {
-        $set: {
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          description: job.description,
-          applyUrl: job.applyUrl,
-          salary: job.salary,
-          tags: job.tags,
-          coordinates: job.coordinates,
-          source: "adzuna",
-          isVerified: false,
-          externalId: job.externalId,
-          createdAt: job.createdAt,
-        },
-        $setOnInsert: {
-          aiAnalysis: null,
-        },
-      },
-      upsert: true,
-    },
-  }));
-
-  const result = await Job.bulkWrite(operations, { ordered: false });
-  return {
-    fetched: adzunaJobs.length,
-    upserted: result.upsertedCount || 0,
-    modified: result.modifiedCount || 0,
-    matched: result.matchedCount || 0,
-  };
-};
-
-const syncAdzunaToMongo = async ({
-  location = "",
-  role = "",
-  radius = "",
-  maxPages = ADZUNA_MAX_PAGES,
-} = {}) => {
-  const adzunaJobs = await fetchAdzunaPages({ location, role, radius, maxPages });
-  const stats = await upsertAdzunaJobs(adzunaJobs);
-  return { ...stats, pages: maxPages };
-};
-
-const runAdzunaSync = async ({
-  force = false,
-  location = "",
-  role = "",
-  radius = "",
-  maxPages = ADZUNA_MAX_PAGES,
-} = {}) => {
-  if (!hasAdzunaConfig()) {
-    return null;
-  }
-
-  const isStale = Date.now() - lastAdzunaSyncAt >= ADZUNA_SYNC_COOLDOWN_MS;
-  if (!force && !isStale) {
-    return null;
-  }
-
-  if (adzunaSyncPromise) {
-    return adzunaSyncPromise;
-  }
-
-  adzunaSyncPromise = syncAdzunaToMongo({ location, role, radius, maxPages })
-    .then((stats) => {
-      lastAdzunaSyncAt = Date.now();
-      return stats;
-    })
-    .catch((error) => {
-      console.error("Adzuna sync failed:", error.message);
-      return null;
-    })
-    .finally(() => {
-      adzunaSyncPromise = null;
-    });
-
-  return adzunaSyncPromise;
-};
-
-const waitForGeminiRateLimit = async () => {
-  const elapsed = Date.now() - lastGeminiAnalysisAt;
-  const waitMs = GEMINI_ANALYSIS_DELAY_MS - elapsed;
-  if (waitMs > 0) {
-    await sleep(waitMs);
-  }
-  lastGeminiAnalysisAt = Date.now();
-};
-
-const runPendingAdzunaAnalysisWorker = async ({ maxJobs = GEMINI_ANALYSIS_BATCH_SIZE } = {}) => {
-  if (analysisWorkerRunning) {
-    return { processed: 0, skipped: true };
-  }
-
-  analysisWorkerRunning = true;
-  let processed = 0;
-
+// Ingestion Layer
+export const fetchAndEnrichJobs = async (req, res) => {
   try {
-    while (processed < maxJobs) {
-      const pendingJob = await Job.findOne(pendingAdzunaAnalysisQuery).sort({ createdAt: -1 });
-      if (!pendingJob) break;
+    // 1. Fetch from Adzuna automatically
+    const adzunaRawJobs = await fetchAdzunaPages({ maxPages: ADZUNA_MAX_PAGES });
 
-      await waitForGeminiRateLimit();
-      const analysis = await analyzeJobWithGemini(pendingJob.toObject());
-      pendingJob.aiAnalysis = analysis;
-      await pendingJob.save();
-      processed += 1;
+    // 2. Fetch from JSearch automatically
+    const jsearchRawJobs = await fetchJSearchJobs("software engineer internship", 2);
+
+    // Normalize JSearch jobs to look like Adzuna for the ingestion loop
+    const normalizedJSearch = jsearchRawJobs.map(job => ({
+      id: job.job_id,
+      title: job.job_title,
+      company: { display_name: job.employer_name },
+      location: { display_name: `${job.job_city || ''}, ${job.job_state || ''}` },
+      description: job.job_description,
+      redirect_url: job.job_apply_link,
+      source_tag: "jsearch"
+    }));
+
+    const rawJobs = [...adzunaRawJobs, ...normalizedJSearch];
+
+    let newJobsCount = 0;
+
+    // 2. Process and Enrich Only New Jobs
+    for (const rawJob of rawJobs) {
+      if (!rawJob?.id) continue;
+
+      const exists = await Job.findOne({ sourceId: String(rawJob.id) });
+      if (exists) continue;
+
+      let jobDoc = {
+        title: rawJob.title,
+        company: rawJob.company?.display_name || "Unknown Company",
+        location: rawJob.location?.display_name || "Remote",
+        description: rawJob.description || "",
+        applyUrl: rawJob.redirect_url || "",
+        source: rawJob.source_tag || "adzuna", // Distinguish source gracefully
+        sourceId: String(rawJob.id),
+        externalId: String(rawJob.id), // legacy support
+        redirectPenalty: (rawJob.redirect_url || "").toLowerCase().includes("linkedin.com") ? -3 : 0,
+      };
+
+      // 3. AI Enrichment (Ensuring we respect Rate Limits via the existing geminiService queue if we wanted, but aiService direct is faster for structured data)
+      const aiData = await enrichJobWithAI(jobDoc.title, jobDoc.company, jobDoc.description);
+
+      if (aiData) {
+        jobDoc = { ...jobDoc, ...aiData, isEnriched: true };
+      }
+
+      await Job.create(jobDoc);
+      newJobsCount++;
     }
+
+    res.status(200).json({ message: "Ingestion and AI enrichment complete.", newJobsCount });
   } catch (error) {
-    console.error("Pending Adzuna analysis failed:", error.message);
-  } finally {
-    analysisWorkerRunning = false;
+    console.error("fetchAndEnrichJobs Error:", error.message);
+    res.status(500).json({ error: error.message });
   }
-
-  return { processed, skipped: false };
-};
-
-const queueAdzunaAnalysis = (maxJobs = GEMINI_ANALYSIS_BATCH_SIZE) => {
-  void runPendingAdzunaAnalysisWorker({ maxJobs });
 };
 
 export const getJobs = async (req, res) => {
   try {
-    const location = String(req.query.location || "").trim();
-    const role = String(req.query.role || "").trim();
-    const radius = String(req.query.radius || "").trim().toLowerCase();
-    const page = parsePositiveInt(req.query.page, 1);
-    const limit = Math.min(50, parsePositiveInt(req.query.limit, 20));
-    const { remoteOnly } = parseRadius(radius);
+    const {
+      page = 1,
+      limit = 20,
+      highQualityOnly = "false",
+      role,
+      location,
+      userSkills = [] // Can be passed from frontend user profile
+    } = req.query;
 
-    if (hasAdzunaConfig()) {
-      const adzunaStoredCount = await Job.countDocuments({ source: "adzuna" });
-      if (adzunaStoredCount < ADZUNA_RESULTS_PER_PAGE) {
-        await runAdzunaSync({ force: true, maxPages: ADZUNA_MAX_PAGES });
-      } else if (page === 1) {
-        const searchDriven = Boolean(location || role || radius);
-        void runAdzunaSync({
-          force: searchDriven,
-          location,
-          role,
-          radius,
-          maxPages: searchDriven ? ADZUNA_SEARCH_PAGES : ADZUNA_MAX_PAGES,
-        });
-      }
-      queueAdzunaAnalysis(1);
-    }
+    const matchStage = {};
+    if (role) matchStage.roleCategory = role;
+    if (location) matchStage.location = new RegExp(escapeRegex(location), "i");
+    if (highQualityOnly === "true") matchStage.qualityScore = { $gte: 7 };
 
-    const dbQuery = {};
-    if (remoteOnly) {
-      dbQuery.location = { $regex: "remote", $options: "i" };
-    } else if (location) {
-      dbQuery.location = { $regex: escapeRegex(location), $options: "i" };
-    }
-    if (role) dbQuery.title = { $regex: escapeRegex(role), $options: "i" };
+    const parsedUserSkills = Array.isArray(userSkills)
+      ? userSkills
+      : userSkills.split(',').map(s => s.trim().toLowerCase());
 
-    const [totalFromDb, jobsFromDb] = await Promise.all([
-      Job.countDocuments(dbQuery),
-      Job.find(dbQuery)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-    ]);
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $addFields: {
+          skillMatchPercentage: {
+            $cond: {
+              if: { $gt: [{ $size: { $ifNull: ["$skills", []] } }, 0] },
+              then: {
+                $multiply: [
+                  {
+                    $divide: [
+                      {
+                        $size: {
+                          $setIntersection: [
+                            { $map: { input: "$skills", as: "s", in: { $toLower: "$$s" } } },
+                            parsedUserSkills
+                          ]
+                        }
+                      },
+                      { $size: "$skills" }
+                    ]
+                  },
+                  100
+                ]
+              },
+              else: 0
+            }
+          },
+          tierWeight: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$companyTier", "Tier1"] }, then: 10 },
+                { case: { $eq: ["$companyTier", "Tier2"] }, then: 6 },
+                { case: { $eq: ["$companyTier", "Startup"] }, then: 4 }
+              ],
+              default: 2
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          finalScore: {
+            $add: [
+              "$tierWeight",
+              { $multiply: [{ $ifNull: ["$qualityScore", 5] }, 2] },
+              { $divide: ["$skillMatchPercentage", 10] },
+              { $ifNull: ["$redirectPenalty", 0] }
+            ]
+          }
+        }
+      },
+      { $sort: { finalScore: -1, createdAt: -1 } },
+      { $skip: (Number(page) - 1) * Number(limit) },
+      { $limit: Number(limit) }
+    ];
 
-    const jobs = applyAuthenticityFilter(jobsFromDb);
+    const jobs = await Job.aggregate(pipeline);
+    const totalFromDb = await Job.countDocuments(matchStage);
 
     return res.json({
       jobs,
       total: totalFromDb,
-      page,
-      limit,
-      radius,
-      source: "mongodb",
+      page: Number(page),
+      limit: Number(limit),
+      source: "mongodb/ai-ranked"
     });
   } catch (error) {
     console.error("getJobs error:", error.message);

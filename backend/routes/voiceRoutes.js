@@ -1,5 +1,5 @@
 import express from "express";
-import { streamMentorVoice } from "../controllers/voiceController.js";
+import { streamMentorVoice, generateSpeech } from "../controllers/voiceController.js";
 import { protect, studentOnly } from "../middleware/firebaseAuthMiddleware.js";
 
 const router = express.Router();
@@ -13,5 +13,6 @@ const audioBlobParser = express.raw({
 });
 
 router.post("/mentor", protect, studentOnly, audioBlobParser, streamMentorVoice);
+router.post("/generate", protect, studentOnly, generateSpeech);
 
 export default router;

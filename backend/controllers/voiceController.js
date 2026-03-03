@@ -1,4 +1,5 @@
 import { Readable } from "stream";
+import axios from "axios";
 
 const MENTOR_VOICE_ID = process.env.ELEVENLABS_MENTOR_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
 const ELEVENLABS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_sts_v2";
@@ -93,3 +94,55 @@ export const streamMentorVoice = async (req, res) => {
 
   nodeReadable.pipe(res);
 };
+
+export const generateSpeech = async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text) {
+      return res.status(400).json({ error: "Text is required" });
+    }
+
+    const VOICE_ID = process.env.ELEVENLABS_TTS_VOICE_ID || "pNInz6obpgDQGcFmaJcg"; // Default: Adam
+    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+
+    if (!ELEVENLABS_API_KEY) {
+      return res.status(500).json({ error: "Server misconfiguration: ELEVENLABS_API_KEY is missing." });
+    }
+
+    const headers = {
+      "Accept": "audio/mpeg",
+      "xi-api-key": ELEVENLABS_API_KEY,
+      "Content-Type": "application/json",
+    };
+
+    const payload = {
+      text: text,
+      model_id: "eleven_turbo_v2_5",
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.75,
+      }
+    };
+
+    const response = await axios({
+      method: "POST",
+      url: `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`,
+      data: payload,
+      headers: headers,
+      responseType: "stream"
+    });
+
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    response.data.pipe(res);
+
+  } catch (error) {
+    console.error("ElevenLabs TTS Error:", error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: "Failed to generate speech"
+    });
+  }
+};
+

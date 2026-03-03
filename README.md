@@ -36,8 +36,9 @@
 
 - 🎨 **Premium UI/UX:** Built with Tailwind CSS, Framer Motion, and Glassmorphism design principles. Includes full Dark/Light mode support with persistence.
 - 🔐 **Robust Authentication:** Secure JWT-based email/password registration alongside Social OAuth (Google, GitHub) handled via Firebase and synced to MongoDB.
-- ⚡ **Real-Time Job Aggregation:** Integrates with the Adzuna API to fetch, map, and organize thousands of global internship opportunities.
-- 🧠 **AI-Powered "Mentor":** Employs Google's Gemini AI to analyze raw job descriptions and instantly generate custom, targeted interview prep questions.
+- ⚡ **Automated Job Ingestion:** Integrates with Adzuna and JSearch APIs to aggregate thousands of global internships without manual cron scripting.
+- 🧠 **Dynamic AI Matching Engine:** Employs Google's Gemini 1.5 Flash to automatically enrich job postings (Company Tiers, Skill Extraction) and uses a MongoDB Aggregation Pipeline to score and rank jobs dynamically against user profiles.
+- 🎙️ **Streaming AI Mentor Voice:** Integrates the ElevenLabs Text-to-Speech API to convert AI-generated career advice directly into a streaming audio response.
 - ✨ **AI Cover Letter & Outreach:** Instantly generates highly professional, personalized cold outreach emails tailored to the student's profile and the specific job description using Gemini 2.5 Flash.
 - 📊 **Kanban Pipeline Tracker:** A beautifully interactive, drag-and-drop Kanban board enabling students to track application statuses (`Saved`, `Applied`, `Interviewing`, `Accepted`).
 - 📍 **Location-Aware Filtering:** Browser Geolocation API integration automatically detects city/state for hyper-local internship results.
@@ -53,8 +54,9 @@
 ### Backend
 - **Runtime:** Node.js
 - **Framework:** Express.js
-- **Database:** MongoDB (Mongoose ORM)
-- **AI Integration:** `@google/generative-ai` (Gemini Pro)
+- **Database:** MongoDB (Mongoose ORM with advanced Aggregation Pipelines)
+- **AI Integration:** `@google/generative-ai` (Gemini 1.5 & 2.5 Flash instances)
+- **Voice Integration:** ElevenLabs TTS API
 - **Authentication:** Firebase Admin SDK (JWT Validation)
 
 ## 🚀 Quick Start
@@ -114,6 +116,8 @@ FIREBASE_PRIVATE_KEY="your_firebase_private_key"
 GEMINI_API_KEY=your_google_gemini_api_key
 ADZUNA_APP_ID=your_adzuna_app_id
 ADZUNA_APP_KEY=your_adzuna_app_key
+JSEARCH_API_KEY=your_rapidapi_jsearch_key
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ```
 
 ### Frontend (`/frontend/.env`)

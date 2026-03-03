@@ -163,45 +163,58 @@ export const fetchAndEnrichJobs = async (req, res) => {
   try {
     // 1. Fetch from Adzuna automatically
     const adzunaRawJobs = await fetchAdzunaPages({ maxPages: ADZUNA_MAX_PAGES });
+    const normalizedAdzunaJobs = adzunaRawJobs
+      .filter((job) => job?.id)
+      .map((job) => normalizeAdzunaJobForDb(job));
 
     // 2. Fetch from JSearch automatically
-    const jsearchRawJobs = await fetchJSearchJobs("software engineer internship", 2);
-
-    // Normalize JSearch jobs to look like Adzuna for the ingestion loop
-    const normalizedJSearch = jsearchRawJobs.map(job => ({
-      id: job.job_id,
-      title: job.job_title,
-      company: { display_name: job.employer_name },
-      location: { display_name: `${job.job_city || ''}, ${job.job_state || ''}` },
-      description: job.job_description,
-      redirect_url: job.job_apply_link,
-      source_tag: "jsearch"
-    }));
-
-    const rawJobs = [...adzunaRawJobs, ...normalizedJSearch];
+    const normalizedJSearchJobs = await fetchJSearchJobs("software engineer internship", 2);
+    const normalizedJobs = [...normalizedAdzunaJobs, ...normalizedJSearchJobs];
 
     let newJobsCount = 0;
 
-    // 2. Process and Enrich Only New Jobs
-    for (const rawJob of rawJobs) {
-      if (!rawJob?.id) continue;
+    // 3. Process and enrich only new jobs
+    for (const normalizedJob of normalizedJobs) {
+      if (!normalizedJob?.externalId) {
+        continue;
+      }
+      if (!normalizedJob.applyUrl) {
+        continue;
+      }
 
-      const exists = await Job.findOne({ sourceId: String(rawJob.id) });
-      if (exists) continue;
+      const source = normalizedJob.source === "adzuna" ? "adzuna" : "local";
+      const externalId = String(normalizedJob.externalId);
+      const exists = await Job.findOne({ source, externalId }).lean();
+      if (exists) {
+        continue;
+      }
 
       let jobDoc = {
-        title: rawJob.title,
-        company: rawJob.company?.display_name || "Unknown Company",
-        location: rawJob.location?.display_name || "Remote",
-        description: rawJob.description || "",
-        applyUrl: rawJob.redirect_url || "",
-        source: rawJob.source_tag || "adzuna", // Distinguish source gracefully
-        sourceId: String(rawJob.id),
-        externalId: String(rawJob.id), // legacy support
-        redirectPenalty: (rawJob.redirect_url || "").toLowerCase().includes("linkedin.com") ? -3 : 0,
+        title: normalizedJob.title || "Internship Opportunity",
+        company: normalizedJob.company || "Unknown Company",
+        location: normalizedJob.location || "Remote",
+        description: normalizedJob.description || "No description provided.",
+        applyUrl: normalizedJob.applyUrl || "",
+        salary: normalizedJob.salary || "Not Disclosed",
+        source,
+        externalId,
+        isVerified: Boolean(normalizedJob.isVerified),
+        tags: Array.isArray(normalizedJob.tags) ? normalizedJob.tags : [],
+        coordinates: {
+          lat: Number.isFinite(Number(normalizedJob.coordinates?.lat))
+            ? Number(normalizedJob.coordinates.lat)
+            : null,
+          lng: Number.isFinite(Number(normalizedJob.coordinates?.lng))
+            ? Number(normalizedJob.coordinates.lng)
+            : null,
+        },
+        createdAt: normalizedJob.createdAt || new Date(),
+        redirectPenalty: Number.isFinite(normalizedJob.redirectPenalty)
+          ? normalizedJob.redirectPenalty
+          : 0,
       };
 
-      // 3. AI Enrichment (Ensuring we respect Rate Limits via the existing geminiService queue if we wanted, but aiService direct is faster for structured data)
+      // 4. AI enrichment
       const aiData = await enrichJobWithAI(jobDoc.title, jobDoc.company, jobDoc.description);
 
       if (aiData) {

@@ -8,9 +8,10 @@ const searchJobs = async (req, res) => {
     }
 
     const rapidApiKey = process.env.RAPIDAPI_KEY;
+    const rapidApiHost = process.env.RAPIDAPI_HOST;
 
-    if (!rapidApiKey) {
-        console.warn("RapidAPI Key missing in environment variables.")
+    if (!rapidApiKey || !rapidApiHost) {
+        console.warn("RapidAPI credentials missing in environment variables.");
         return res.status(500).json({ status: 500, error: 'Internal Server Error: API Configuration Missing' });
     }
 
@@ -21,7 +22,7 @@ const searchJobs = async (req, res) => {
         url: 'https://jsearch.p.rapidapi.com/search',
         headers: {
             'X-RapidAPI-Key': rapidApiKey,
-            'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
+            'X-RapidAPI-Host': rapidApiHost
         },
         params: {
             query: jsearchQuery,
@@ -40,7 +41,6 @@ const searchJobs = async (req, res) => {
         }
 
         const jobs = response.data.data.map((job) => {
-
             let applyUrl = job.job_apply_link;
             let redirectPenalty = false;
 
@@ -56,20 +56,33 @@ const searchJobs = async (req, res) => {
                 applyUrl: applyUrl,
                 employmentType: job.job_employment_type,
                 source: "JSearch",
-                ...(redirectPenalty && { redirectPenalty: true }) // Only add if true
+                ...(redirectPenalty && { redirectPenalty: true })
             };
         });
 
         return res.status(200).json(jobs);
 
     } catch (error) {
-        if (error.response && error.response.data) {
-            console.error("JSearch API Error:", error.response.data);
+        const status = error.response?.status;
+
+        // Handle specific RapidAPI errors with clear logging
+        if (status === 401) {
+            console.error("RapidAPI 401 Error: Invalid or missing API key.");
+        } else if (status === 403) {
+            console.error(`RapidAPI 403 Error: Host header incorrect. Should be ${rapidApiHost}`);
+        } else if (status === 429) {
+            console.error("RapidAPI 429 Error: Rate limit exceeded.");
+        } else if (error.response && error.response.data) {
+            console.error(`JSearch API Error (Status ${status}):`, error.response.data);
         } else {
             console.error("Axios Error Fetching Jobs:", error.message);
         }
 
-        return res.status(500).json({ status: 500, error: 'Failed to fetch jobs from provider' });
+        return res.status(status || 500).json({
+            status: status || 500,
+            error: 'Failed to fetch jobs from provider',
+            details: error.response?.data || error.message
+        });
     }
 };
 

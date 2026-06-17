@@ -127,6 +127,7 @@ const upsertAdzunaJobs = async (adzunaJobs) => {
 
 const runAdzunaSync = async ({ force, location, role, radius, maxPages }) => {
   const adzunaJobs = await fetchAdzunaPages({ location, role, radius, maxPages });
+  console.log(`runAdzunaSync: fetched ${adzunaJobs.length} jobs total from Adzuna API.`);
   let upserted = 0;
   for (const job of adzunaJobs) {
     const normalized = normalizeAdzunaJobForDb(job);
@@ -138,6 +139,7 @@ const runAdzunaSync = async ({ force, location, role, radius, maxPages }) => {
       upserted++;
     }
   }
+  console.log(`runAdzunaSync: upserted ${upserted} new jobs into DB.`);
   return {
     fetched: adzunaJobs.length,
     upserted,
@@ -194,15 +196,29 @@ const fetchAdzunaPages = async ({
 
   const { remoteOnly, distanceKm } = parseRadius(radius);
   const normalizedRole = String(role || "").trim();
-  const normalizedLocation = remoteOnly ? "" : String(location || "").trim();
-  const whatValue = remoteOnly
-    ? `${normalizedRole ? `${normalizedRole} ` : ""}remote internship`
-    : `${normalizedRole ? `${normalizedRole} ` : ""}internship`;
+  let normalizedLocation = remoteOnly ? "" : String(location || "").trim();
+  if (normalizedLocation) {
+    const parts = normalizedLocation.split(",");
+    normalizedLocation = parts[0].trim();
+  }
+  let whatValue = "internship";
+  if (normalizedRole) {
+    whatValue = normalizedRole;
+    if (remoteOnly) {
+      whatValue += " remote";
+    }
+  } else {
+    whatValue = remoteOnly ? "remote internship" : "internship";
+  }
 
   const collected = [];
 
   for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
     const adzunaUrl = `${process.env.ADZUNA_BASE_URL}/${process.env.ADZUNA_COUNTRY}/search/${pageNumber}`;
+    console.log(`fetchAdzunaPages: Querying Adzuna URL: ${adzunaUrl} with params:`, {
+      what: whatValue,
+      where: normalizedLocation
+    });
     const response = await axios.get(adzunaUrl, {
       params: {
         app_id: process.env.ADZUNA_APP_ID,
@@ -216,6 +232,7 @@ const fetchAdzunaPages = async ({
     });
 
     const pageResults = Array.isArray(response.data?.results) ? response.data.results : [];
+    console.log(`fetchAdzunaPages: Adzuna API returned ${pageResults.length} results.`);
     collected.push(...pageResults);
 
     if (pageResults.length < ADZUNA_RESULTS_PER_PAGE) {
@@ -329,7 +346,11 @@ export const getJobs = async (req, res) => {
     if (location) {
       const parts = location.split(",").map(p => p.trim()).filter(Boolean);
       if (parts.length > 0) {
-        matchStage.location = new RegExp(escapeRegex(parts[0]), "i");
+        let locQuery = parts[0];
+        if (locQuery.toLowerCase().includes("delhi")) {
+          locQuery = "Delhi";
+        }
+        matchStage.location = new RegExp(escapeRegex(locQuery), "i");
       }
     }
     if (highQualityOnly === "true") matchStage.qualityScore = { $gte: 7 };

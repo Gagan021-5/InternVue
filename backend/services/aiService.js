@@ -24,7 +24,7 @@ export const enrichJobWithAI = async (jobTitle, company, description) => {
     Extract and classify the following information. Return ONLY strictly valid JSON.
     
     TASKS:
-    1. roleCategory: Must be one of ["Full Stack", "SDE", "Frontend", "Backend", "Data Science", "AI/ML", "DevOps", "Cloud", "Mobile", "Cybersecurity", "Other"].
+    1. roleCategory: Must be one of ["Full Stack", "SDE", "Frontend", "Backend", "Data Science", "AI/ML", "DevOps", "Cloud", "Mobile", "Cybersecurity", "HR", "Marketing", "Sales", "Finance", "Content", "Design", "Other"].
     2. seniorityLevel: Determine if it is "Internship", "Entry-Level", or "Senior".
     3. companyTier: Must be one of ["Tier1" (FAANG/Global Tech), "Tier2" (Established Tech), "Startup" (Small/New), "Unknown"].
     4. qualityScore: Rate the clarity and detail of the job description from 1 to 10.

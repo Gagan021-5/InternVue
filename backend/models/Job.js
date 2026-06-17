@@ -21,7 +21,7 @@ const jobSchema = new mongoose.Schema({
   // AI Enriched Fields
   roleCategory: {
     type: String,
-    enum: ["Full Stack", "SDE", "Frontend", "Backend", "Data Science", "AI/ML", "DevOps", "Cloud", "Mobile", "Cybersecurity", "Other"],
+    enum: ["Full Stack", "SDE", "Frontend", "Backend", "Data Science", "AI/ML", "DevOps", "Cloud", "Mobile", "Cybersecurity", "HR", "Marketing", "Sales", "Finance", "Content", "Design", "Other"],
     default: "Other"
   },
   seniorityLevel: { type: String, default: "Internship" },

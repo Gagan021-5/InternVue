@@ -317,19 +317,13 @@ export const getJobs = async (req, res) => {
       matchStage.roleCategory = category;
     }
     if (role) {
-      const enumValues = ["Full Stack", "SDE", "Frontend", "Backend", "Data Science", "AI/ML", "DevOps", "Cloud", "Mobile", "Cybersecurity", "Other"];
-      const isEnum = enumValues.some(val => val.toLowerCase() === role.toLowerCase());
-      if (isEnum) {
-        const matchedEnum = enumValues.find(val => val.toLowerCase() === role.toLowerCase());
-        matchStage.roleCategory = matchedEnum;
-      } else {
-        matchStage.$or = [
-          { title: new RegExp(escapeRegex(role), "i") },
-          { description: new RegExp(escapeRegex(role), "i") },
-          { tags: new RegExp(escapeRegex(role), "i") },
-          { skills: new RegExp(escapeRegex(role), "i") }
-        ];
-      }
+      matchStage.$or = [
+        { roleCategory: new RegExp(escapeRegex(role), "i") },
+        { title: new RegExp(escapeRegex(role), "i") },
+        { description: new RegExp(escapeRegex(role), "i") },
+        { tags: new RegExp(escapeRegex(role), "i") },
+        { skills: new RegExp(escapeRegex(role), "i") }
+      ];
     }
     if (location) matchStage.location = new RegExp(escapeRegex(location), "i");
     if (highQualityOnly === "true") matchStage.qualityScore = { $gte: 7 };

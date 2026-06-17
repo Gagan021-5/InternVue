@@ -15,8 +15,13 @@ const JOB_CATEGORIES = [
   "Python",
   "Frontend",
   "Backend",
-  "Web3",
+  "HR",
+  "Marketing",
+  "Sales",
+  "Finance",
+  "Content",
   "Design",
+  "Web3",
 ];
 
 const categoryTermsMap = {
@@ -45,14 +50,22 @@ export default function FeedPage() {
   const { backendCategory, backendRole } = useMemo(() => {
     let cat = "";
     let r = role;
-    if (activeCategory === "Full-Stack (MERN)") {
-      cat = "Full Stack";
-    } else if (activeCategory === "AI/ML (Numpy/Pandas)") {
-      cat = "AI/ML";
-    } else if (activeCategory === "Frontend") {
-      cat = "Frontend";
-    } else if (activeCategory === "Backend") {
-      cat = "Backend";
+    
+    const categoryMapping = {
+      "Full-Stack (MERN)": "Full Stack",
+      "AI/ML (Numpy/Pandas)": "AI/ML",
+      "Frontend": "Frontend",
+      "Backend": "Backend",
+      "HR": "HR",
+      "Marketing": "Marketing",
+      "Sales": "Sales",
+      "Finance": "Finance",
+      "Content": "Content",
+      "Design": "Design",
+    };
+
+    if (categoryMapping[activeCategory]) {
+      cat = categoryMapping[activeCategory];
     } else if (activeCategory !== "All") {
       if (!role) {
         r = activeCategory;

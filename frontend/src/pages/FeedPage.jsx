@@ -40,8 +40,15 @@ export default function FeedPage() {
     tags: [],
   });
 
-  const { jobs, loading, error, totalJobs } = useJobs({ location, role, radius, page, limit: pageSize });
-  const { isAuthenticated } = useAuthContext();
+  const { isAuthenticated, mongoUser } = useAuthContext();
+  const { jobs, loading, error, totalJobs } = useJobs({
+    location,
+    role,
+    radius,
+    page,
+    limit: pageSize,
+    userSkills: mongoUser?.skills || []
+  });
   const [savedIds, setSavedIds] = useState(new Set());
 
   useEffect(() => {

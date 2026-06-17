@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import axiosInstance from "../api/axiosInstance";
 
-export default function useJobs({ location = "", role = "", radius = "", page = 1, limit = 20 }) {
+export default function useJobs({ location = "", role = "", radius = "", page = 1, limit = 20, userSkills = [] }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -15,8 +15,9 @@ export default function useJobs({ location = "", role = "", radius = "", page = 
       radius,
       page,
       limit,
+      userSkills: Array.isArray(userSkills) ? userSkills.join(",") : userSkills,
     }),
-    [location, role, radius, page, limit]
+    [location, role, radius, page, limit, userSkills]
   );
 
   const fetchJobs = useCallback(async (signal, requestParams) => {

@@ -249,8 +249,8 @@ export const getJobs = async (req, res) => {
     if (highQualityOnly === "true") matchStage.qualityScore = { $gte: 7 };
 
     const parsedUserSkills = Array.isArray(userSkills)
-      ? userSkills
-      : userSkills.split(',').map(s => s.trim().toLowerCase());
+      ? userSkills.map(s => String(s || "").trim().toLowerCase()).filter(Boolean)
+      : String(userSkills || "").split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
     const pipeline = [
       { $match: matchStage },

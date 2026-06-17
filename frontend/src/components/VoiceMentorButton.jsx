@@ -169,6 +169,9 @@ export default function VoiceMentorButton() {
     });
 
     if (!response.ok) {
+      if (response.status === 402) {
+        throw new Error("ElevenLabs Voice API quota has been exhausted (402 Payment Required). Please configure a valid ELEVENLABS_API_KEY with active credits in the backend .env file.");
+      }
       const responseText = await response.text();
       let responseErrorMessage = responseText;
       try {

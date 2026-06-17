@@ -114,6 +114,74 @@ const normalizeAdzunaJobForDb = (adzunaJob) => {
   };
 };
 
+const upsertAdzunaJobs = async (adzunaJobs) => {
+  for (const job of adzunaJobs) {
+    const normalized = normalizeAdzunaJobForDb(job);
+    await Job.findOneAndUpdate(
+      { source: "adzuna", externalId: normalized.externalId },
+      normalized,
+      { upsert: true, new: true }
+    );
+  }
+};
+
+const runAdzunaSync = async ({ force, location, role, radius, maxPages }) => {
+  const adzunaJobs = await fetchAdzunaPages({ location, role, radius, maxPages });
+  let upserted = 0;
+  for (const job of adzunaJobs) {
+    const normalized = normalizeAdzunaJobForDb(job);
+    const exists = await Job.findOne({ source: "adzuna", externalId: normalized.externalId }).lean();
+    if (!exists) {
+      const aiData = await enrichJobWithAI(normalized.title, normalized.company, normalized.description);
+      const jobDoc = aiData ? { ...normalized, ...aiData, isEnriched: true } : normalized;
+      await Job.create(jobDoc);
+      upserted++;
+    }
+  }
+  return {
+    fetched: adzunaJobs.length,
+    upserted,
+    modified: 0,
+    matched: adzunaJobs.length,
+  };
+};
+
+const runPendingAdzunaAnalysisWorker = async ({ maxJobs = 1 } = {}) => {
+  if (analysisWorkerRunning) {
+    return { processed: 0, skipped: 0, message: "Worker already running" };
+  }
+  analysisWorkerRunning = true;
+  let processed = 0;
+  try {
+    const pendingJobs = await Job.find(pendingAdzunaAnalysisQuery).limit(maxJobs);
+    for (const job of pendingJobs) {
+      const analysis = await analyzeJobWithGemini(job);
+      if (analysis) {
+        job.aiAnalysis = analysis;
+        if (analysis.extractedSkills?.length) {
+          job.skills = [...new Set([...(job.skills || []), ...analysis.extractedSkills])];
+        }
+        job.isEnriched = true;
+        await job.save();
+        processed++;
+      }
+    }
+  } catch (error) {
+    console.error("runPendingAdzunaAnalysisWorker error:", error.message);
+  } finally {
+    analysisWorkerRunning = false;
+  }
+  return { processed, skipped: 0 };
+};
+
+const queueAdzunaAnalysis = (batchSize) => {
+  setTimeout(() => {
+    runPendingAdzunaAnalysisWorker({ maxJobs: batchSize }).catch((err) => {
+      console.error("Background analysis error:", err.message);
+    });
+  }, 100);
+};
+
 const fetchAdzunaPages = async ({
   location = "",
   role = "",
@@ -239,12 +307,30 @@ export const getJobs = async (req, res) => {
       limit = 20,
       highQualityOnly = "false",
       role,
+      category,
       location,
       userSkills = [] // Can be passed from frontend user profile
     } = req.query;
 
     const matchStage = {};
-    if (role) matchStage.roleCategory = role;
+    if (category && category !== "All") {
+      matchStage.roleCategory = category;
+    }
+    if (role) {
+      const enumValues = ["Full Stack", "SDE", "Frontend", "Backend", "Data Science", "AI/ML", "DevOps", "Cloud", "Mobile", "Cybersecurity", "Other"];
+      const isEnum = enumValues.some(val => val.toLowerCase() === role.toLowerCase());
+      if (isEnum) {
+        const matchedEnum = enumValues.find(val => val.toLowerCase() === role.toLowerCase());
+        matchStage.roleCategory = matchedEnum;
+      } else {
+        matchStage.$or = [
+          { title: new RegExp(escapeRegex(role), "i") },
+          { description: new RegExp(escapeRegex(role), "i") },
+          { tags: new RegExp(escapeRegex(role), "i") },
+          { skills: new RegExp(escapeRegex(role), "i") }
+        ];
+      }
+    }
     if (location) matchStage.location = new RegExp(escapeRegex(location), "i");
     if (highQualityOnly === "true") matchStage.qualityScore = { $gte: 7 };
 

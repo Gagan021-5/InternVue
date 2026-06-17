@@ -41,9 +41,30 @@ export default function FeedPage() {
   });
 
   const { isAuthenticated, mongoUser } = useAuthContext();
+
+  const { backendCategory, backendRole } = useMemo(() => {
+    let cat = "";
+    let r = role;
+    if (activeCategory === "Full-Stack (MERN)") {
+      cat = "Full Stack";
+    } else if (activeCategory === "AI/ML (Numpy/Pandas)") {
+      cat = "AI/ML";
+    } else if (activeCategory === "Frontend") {
+      cat = "Frontend";
+    } else if (activeCategory === "Backend") {
+      cat = "Backend";
+    } else if (activeCategory !== "All") {
+      if (!role) {
+        r = activeCategory;
+      }
+    }
+    return { backendCategory: cat, backendRole: r };
+  }, [activeCategory, role]);
+
   const { jobs, loading, error, totalJobs } = useJobs({
     location,
-    role,
+    role: backendRole,
+    category: backendCategory,
     radius,
     page,
     limit: pageSize,
@@ -72,16 +93,10 @@ export default function FeedPage() {
 
       const haystack = `${job.title} ${(job.tags || []).join(" ")} ${job.description || ""}`.toLowerCase();
 
-      if (activeCategory !== "All") {
-        const categoryTerms = categoryTermsMap[activeCategory] || [activeCategory.toLowerCase()];
-        const matchesCategory = categoryTerms.some((term) => haystack.includes(term));
-        if (!matchesCategory) return false;
-      }
-
       if (!filters.tags.length) return true;
       return filters.tags.some((tag) => haystack.includes(tag.toLowerCase()));
     });
-  }, [jobs, filters, activeCategory]);
+  }, [jobs, filters]);
 
   const hasNextPage = page * pageSize < totalJobs;
   const activeWhereLabel = radius === "remote" ? "Remote" : location || "India";
@@ -129,7 +144,10 @@ export default function FeedPage() {
             {JOB_CATEGORIES.map((category) => (
               <button
                 key={category}
-                onClick={() => setActiveCategory(category)}
+                onClick={() => {
+                  setActiveCategory(category);
+                  setPage(1);
+                }}
                 className={`relative pb-4 text-sm font-medium transition-colors ${
                   activeCategory === category
                     ? "text-blue-600 dark:text-blue-400"

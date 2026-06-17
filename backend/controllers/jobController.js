@@ -309,6 +309,7 @@ export const getJobs = async (req, res) => {
       role,
       category,
       location,
+      radius,
       userSkills = [] // Can be passed from frontend user profile
     } = req.query;
 
@@ -325,7 +326,12 @@ export const getJobs = async (req, res) => {
         { skills: new RegExp(escapeRegex(role), "i") }
       ];
     }
-    if (location) matchStage.location = new RegExp(escapeRegex(location), "i");
+    if (location) {
+      const parts = location.split(",").map(p => p.trim()).filter(Boolean);
+      if (parts.length > 0) {
+        matchStage.location = new RegExp(escapeRegex(parts[0]), "i");
+      }
+    }
     if (highQualityOnly === "true") matchStage.qualityScore = { $gte: 7 };
 
     const parsedUserSkills = Array.isArray(userSkills)
@@ -389,12 +395,32 @@ export const getJobs = async (req, res) => {
       { $limit: Number(limit) }
     ];
 
-    const jobs = await Job.aggregate(pipeline);
-    const totalFromDb = await Job.countDocuments(matchStage);
+    let finalJobs = await Job.aggregate(pipeline);
+    let finalTotal = await Job.countDocuments(matchStage);
+
+    if (finalJobs.length === 0 && (role || location) && hasAdzunaConfig()) {
+      try {
+        console.log(`No local results. Triggering live Adzuna sync for role: "${role}", location: "${location}"...`);
+        await runAdzunaSync({
+          force: true,
+          location: location || "",
+          role: role || "",
+          radius: radius || "",
+          maxPages: 2,
+        });
+        queueAdzunaAnalysis(5);
+
+        // Re-query the database
+        finalJobs = await Job.aggregate(pipeline);
+        finalTotal = await Job.countDocuments(matchStage);
+      } catch (syncErr) {
+        console.error("Auto-sync on search failed:", syncErr.message);
+      }
+    }
 
     return res.json({
-      jobs,
-      total: totalFromDb,
+      jobs: finalJobs,
+      total: finalTotal,
       page: Number(page),
       limit: Number(limit),
       source: "mongodb/ai-ranked"

@@ -1,21 +1,8 @@
 import { useEffect, useState } from "react";
 
-const tags = [
-  "React",
-  "Node.js",
-  "Python",
-  "Machine Learning",
-  "MongoDB",
-  "Express",
-  "TypeScript",
-  "DevOps",
-  "Next.js",
-  "Data Science",
-];
-
 export default function FilterPanel({ onFilterChange }) {
   const [filters, setFilters] = useState({
-    sources: { local: true, adzuna: true },
+    sources: { local: true, apify: true },
     verifiedOnly: false,
     tags: [],
   });
@@ -24,20 +11,11 @@ export default function FilterPanel({ onFilterChange }) {
     onFilterChange(filters);
   }, [filters, onFilterChange]);
 
-  const toggleTag = (tag) => {
-    setFilters((current) => ({
-      ...current,
-      tags: current.tags.includes(tag)
-        ? current.tags.filter((item) => item !== tag)
-        : [...current.tags, tag],
-    }));
-  };
-
   return (
-    <aside className="section-shell p-4">
+    <aside className="section-shell p-4 bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-white/5 rounded-3xl shadow-sm backdrop-blur-xl">
       <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Filters</h3>
       <div className="mt-4 space-y-3 text-sm">
-        <label className="flex items-center gap-2 text-soft">
+        <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
           <input
             type="checkbox"
             checked={filters.sources.local}
@@ -50,23 +28,23 @@ export default function FilterPanel({ onFilterChange }) {
           />
           Local Verified
         </label>
-        <label className="flex items-center gap-2 text-soft">
+        <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
           <input
             type="checkbox"
-            checked={filters.sources.adzuna}
+            checked={filters.sources.apify}
             onChange={() =>
               setFilters((current) => ({
                 ...current,
-                sources: { ...current.sources, adzuna: !current.sources.adzuna },
+                sources: { ...current.sources, apify: !current.sources.apify },
               }))
             }
           />
-          Adzuna (Remote/Global)
+          Apify (Real-time)
         </label>
       </div>
 
       <div className="mt-5 flex items-center justify-between">
-        <p className="text-sm text-soft">Verified Only</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Verified Only</p>
         <button
           type="button"
           onClick={() =>
@@ -80,25 +58,6 @@ export default function FilterPanel({ onFilterChange }) {
               }`}
           />
         </button>
-      </div>
-
-      <div className="mt-5">
-        <p className="text-sm text-soft">Tags</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => toggleTag(tag)}
-              className={`rounded-full border px-2.5 py-1 text-xs ${filters.tags.includes(tag)
-                  ? "chip-active"
-                  : "chip-neutral"
-                }`}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
       </div>
     </aside>
   );

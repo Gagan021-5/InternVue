@@ -44,7 +44,7 @@ const FEATURES = [
     iconBg: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400",
     title: "AI Career Readiness",
     body:
-      "Gemini-powered analysis surfaces personalized interview questions and skill-gap insights so you walk into every application prepared.",
+      "Advanced analysis surfaces personalized interview questions and skill-gap insights so you walk into every application prepared.",
   },
   {
     col: "md:col-span-4 lg:col-span-1",
@@ -64,8 +64,8 @@ const FEATURES = [
 /* ── Impact rows ────────────────────────────────────────────────────────── */
 const IMPACT = [
   { icon: "📊", title: "Real-time Pipeline Tracker", body: "Kanban board with drag-and-drop cards. Move applications from Saved → Applied → Interviewing without leaving your dashboard." },
-  { icon: "🌏", title: "Global & Local Pipeline", body: "Live Adzuna feed from 900+ global firms merged with hand-curated local startup roles. Searchable, filterable, and always fresh." },
-  { icon: "✍️", title: "AI Outreach Drafts", body: "One-click Gemini-generated cover letters personalised to the job and your profile. Edit and send in under two minutes." },
+  { icon: "🌏", title: "Real-time Internship Pipeline", body: "Apify-powered LinkedIn scraper fetches fresh internships nightly. Merged with hand-curated local startup roles. Searchable, filterable, and always fresh." },
+  { icon: "✍️", title: "AI Outreach Drafts", body: "One-click professionally-generated cover letters personalised to the job and your profile. Edit and send in under two minutes." },
 ];
 
 export default function HomePage() {

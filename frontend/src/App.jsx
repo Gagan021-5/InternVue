@@ -6,6 +6,8 @@ import RegisterPage from "./pages/RegisterPage";
 import StudentDashboard from "./pages/StudentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
+import JobDetailsPage from "./pages/JobDetailsPage";
+import FloatingChatbot from "./components/FloatingChatbot";
 import { useAuthContext } from "./context/AuthContext";
 
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -19,6 +21,8 @@ const DashboardRouter = () => {
 };
 
 export default function App() {
+  const { mongoUser } = useAuthContext();
+
   return (
     <ErrorBoundary>
       <Routes>
@@ -28,6 +32,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <FeedPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/job/:id"
+          element={
+            <ProtectedRoute>
+              <JobDetailsPage />
             </ProtectedRoute>
           }
         />
@@ -43,6 +55,8 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {mongoUser && mongoUser.role === "student" && <FloatingChatbot />}
     </ErrorBoundary>
   );
 }

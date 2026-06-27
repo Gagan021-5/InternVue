@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import axiosInstance from "../api/axiosInstance";
 
-export default function useJobs({ location = "", role = "", radius = "", page = 1, limit = 20, userSkills = [], category = "" }) {
+export default function useJobs({ location = "", role = "", radius = "", page = 1, limit = 30, userSkills = [], category = "" }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [totalJobs, setTotalJobs] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   const params = useMemo(
     () => ({
@@ -24,6 +26,8 @@ export default function useJobs({ location = "", role = "", radius = "", page = 
   const fetchJobs = useCallback(async (signal, requestParams) => {
     setLoading(true);
     setError("");
+    setSyncing(false);
+    setSyncMessage("");
 
     try {
       const response = await axiosInstance.get("/api/jobs", {
@@ -32,6 +36,8 @@ export default function useJobs({ location = "", role = "", radius = "", page = 
       });
       setJobs(response.data.jobs || []);
       setTotalJobs(response.data.total || 0);
+      setSyncing(response.data.syncing || false);
+      setSyncMessage(response.data.message || "");
     } catch (requestError) {
       if (axios.isCancel(requestError) || requestError.name === "CanceledError") {
         return;
@@ -62,5 +68,5 @@ export default function useJobs({ location = "", role = "", radius = "", page = 
     };
   }, [fetchJobs, params]);
 
-  return { jobs, loading, error, totalJobs };
+  return { jobs, loading, error, totalJobs, syncing, syncMessage };
 }

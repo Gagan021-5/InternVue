@@ -1,10 +1,14 @@
-import axios from "axios";
 import mongoose from "mongoose";
 import Job from "../models/Job.js";
 import { applyAuthenticityFilter } from "../middleware/authenticityFilter.js";
 import { analyzeJobWithGemini } from "../services/geminiService.js";
 import { enrichJobWithAI } from "../services/aiService.js";
-import { fetchJSearchJobs } from "../services/jsearchService.js";
+import { fetchApifyInternships } from "../services/apifyService.js";
+import { generateMockInterviewQuestions } from "../services/groqService.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const parsePositiveInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
@@ -13,351 +17,370 @@ const parsePositiveInt = (value, fallback) => {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const escapeRegex = (value = "") => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const ADZUNA_RESULTS_PER_PAGE = 50;
-const ADZUNA_MAX_PAGES = clamp(parsePositiveInt(process.env.ADZUNA_MAX_PAGES, 10), 1, 10);
-const ADZUNA_SEARCH_PAGES = clamp(parsePositiveInt(process.env.ADZUNA_SEARCH_PAGES, 3), 1, 5);
-const ADZUNA_SYNC_COOLDOWN_MS = clamp(
-  parsePositiveInt(process.env.ADZUNA_SYNC_COOLDOWN_MS, 1000 * 60 * 30),
-  1000 * 60,
-  1000 * 60 * 60 * 24
-);
-const GEMINI_ANALYSIS_DELAY_MS = Math.max(
-  12000,
-  parsePositiveInt(process.env.GEMINI_ANALYSIS_DELAY_MS, 15000)
-);
-const GEMINI_ANALYSIS_BATCH_SIZE = clamp(
-  parsePositiveInt(process.env.GEMINI_ANALYSIS_BATCH_SIZE, 1),
-  1,
-  5
-);
+// ---------------------------------------------------------------------------
+// Internship Title Gate
+// Drops anything that is NOT explicitly an internship, co-op, or fellowship.
+// ---------------------------------------------------------------------------
 
-const adzunaStopWords = new Set([
-  "internship",
+const INTERNSHIP_KEYWORDS = [
   "intern",
-  "engineer",
-  "developer",
-  "fullstack",
-  "full-stack",
-  "software",
-  "remote",
-  "junior",
-  "entry",
-  "level",
-]);
+  "co-op",
+  "fellowship",
+  "trainee",
+  "apprentice",
+  "summer analyst",
+  "graduate program",
+  "working student",
+  "placement",
+];
 
-const parseRadius = (radius) => {
-  const normalized = String(radius || "").trim().toLowerCase();
-  if (!normalized) return { remoteOnly: false, distanceKm: null };
-  if (normalized === "remote") return { remoteOnly: true, distanceKm: null };
-  const numeric = parsePositiveInt(normalized, null);
-  return {
-    remoteOnly: false,
-    distanceKm: numeric ? clamp(numeric, 1, 100) : null,
-  };
+/**
+ * Returns true if the title contains at least one internship-related keyword.
+ * @param {string} title
+ * @returns {boolean}
+ */
+const passesInternshipGate = (title = "") => {
+  const lower = title.toLowerCase();
+  return INTERNSHIP_KEYWORDS.some((keyword) => lower.includes(keyword));
 };
 
-const pendingAdzunaAnalysisQuery = {
-  source: "adzuna",
-  $or: [
-    { aiAnalysis: null },
-    { "aiAnalysis.summary": { $exists: false } },
-    { "aiAnalysis.summary": "" },
-  ],
-};
+// ---------------------------------------------------------------------------
+// Core Ingestion Pipeline (shared by cron + REST endpoint)
+// ---------------------------------------------------------------------------
 
-let adzunaSyncPromise = null;
-let lastAdzunaSyncAt = 0;
-let analysisWorkerRunning = false;
-let lastGeminiAnalysisAt = 0;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let isEnriching = false;
 
-const hasAdzunaConfig = () =>
-  Boolean(
-    process.env.ADZUNA_BASE_URL &&
-    process.env.ADZUNA_COUNTRY &&
-    process.env.ADZUNA_APP_ID &&
-    process.env.ADZUNA_APP_KEY
-  );
-
-const extractTitleTags = (title = "") => {
-  const words = title
-    .split(/[\s,/()+-]+/)
-    .map((word) => word.trim())
-    .filter((word) => word.length > 2)
-    .filter((word) => !adzunaStopWords.has(word.toLowerCase()));
-
-  return [...new Set(words)].slice(0, 4);
-};
-
-const normalizeAdzunaJobForDb = (adzunaJob) => {
-  const parsedCreatedAt = new Date(adzunaJob.created || Date.now());
-
-  return {
-    externalId: String(adzunaJob.id),
-    title: adzunaJob.title || "Internship Opportunity",
-    company: adzunaJob.company?.display_name || "Unknown Company",
-    location: adzunaJob.location?.display_name || "Remote",
-    description: adzunaJob.description || "",
-    applyUrl: adzunaJob.redirect_url || "",
-    salary: adzunaJob.salary_min
-      ? `$${adzunaJob.salary_min} - $${adzunaJob.salary_max || adzunaJob.salary_min}`
-      : "Not Disclosed",
-    source: "adzuna",
-    isVerified: false,
-    tags: extractTitleTags(adzunaJob.title || ""),
-    coordinates: {
-      lat: adzunaJob.latitude ?? null,
-      lng: adzunaJob.longitude ?? null,
-    },
-    createdAt: Number.isNaN(parsedCreatedAt.getTime()) ? new Date() : parsedCreatedAt,
-  };
-};
-
-const upsertAdzunaJobs = async (adzunaJobs) => {
-  for (const job of adzunaJobs) {
-    const normalized = normalizeAdzunaJobForDb(job);
-    await Job.findOneAndUpdate(
-      { source: "adzuna", externalId: normalized.externalId },
-      normalized,
-      { upsert: true, new: true }
-    );
+/**
+ * Background enrichment worker that processes unenriched jobs one-by-one
+ * with a rate-limit delay to avoid 429 Too Many Requests errors.
+ */
+export const triggerBackgroundEnrichment = async () => {
+  if (isEnriching) {
+    console.log("[enrichment] Background enrichment worker is already running.");
+    return;
   }
-};
+  isEnriching = true;
+  console.log("[enrichment] Background enrichment worker started.");
 
-const runAdzunaSync = async ({ force, location, role, radius, maxPages }) => {
-  const adzunaJobs = await fetchAdzunaPages({ location, role, radius, maxPages });
-  console.log(`runAdzunaSync: fetched ${adzunaJobs.length} jobs total from Adzuna API.`);
-  let upserted = 0;
-  for (const job of adzunaJobs) {
-    const normalized = normalizeAdzunaJobForDb(job);
-    const exists = await Job.findOne({ source: "adzuna", externalId: normalized.externalId }).lean();
-    if (!exists) {
-      const aiData = await enrichJobWithAI(normalized.title, normalized.company, normalized.description);
-      const jobDoc = aiData ? { ...normalized, ...aiData, isEnriched: true } : normalized;
-      await Job.create(jobDoc);
-      upserted++;
-    }
-  }
-  console.log(`runAdzunaSync: upserted ${upserted} new jobs into DB.`);
-  return {
-    fetched: adzunaJobs.length,
-    upserted,
-    modified: 0,
-    matched: adzunaJobs.length,
-  };
-};
-
-const runPendingAdzunaAnalysisWorker = async ({ maxJobs = 1 } = {}) => {
-  if (analysisWorkerRunning) {
-    return { processed: 0, skipped: 0, message: "Worker already running" };
-  }
-  analysisWorkerRunning = true;
-  let processed = 0;
   try {
-    const pendingJobs = await Job.find(pendingAdzunaAnalysisQuery).limit(maxJobs);
-    for (const job of pendingJobs) {
-      const analysis = await analyzeJobWithGemini(job);
-      if (analysis) {
-        job.aiAnalysis = analysis;
-        if (analysis.extractedSkills?.length) {
-          job.skills = [...new Set([...(job.skills || []), ...analysis.extractedSkills])];
+    while (true) {
+      const job = await Job.findOne({ isEnriched: false });
+      if (!job) {
+        console.log("[enrichment] All jobs are enriched. Background worker stopping.");
+        break;
+      }
+
+      console.log(`[enrichment] Enriching: "${job.title}" at ${job.company}...`);
+
+      try {
+        const aiData = await enrichJobWithAI(job.title, job.company, job.description);
+
+        if (aiData) {
+          await Job.updateOne(
+            { _id: job._id },
+            {
+              $set: {
+                ...aiData,
+                isEnriched: true,
+              },
+            }
+          );
+          console.log(`[enrichment] Successfully enriched: "${job.title}"`);
+        } else {
+          // Fallback if returned value is somehow empty/falsy
+          await Job.updateOne(
+            { _id: job._id },
+            {
+              $set: {
+                isEnriched: true,
+              },
+            }
+          );
+          console.warn(`[enrichment] AI enrichment returned falsy for "${job.title}". Marked as enriched with defaults.`);
         }
-        job.isEnriched = true;
-        await job.save();
-        processed++;
+      } catch (err) {
+        const errMessage = err.message || "";
+        console.error(`[enrichment] Error enriching "${job.title}":`, errMessage);
+
+        if (errMessage.includes("429") || errMessage.toLowerCase().includes("quota") || errMessage.toLowerCase().includes("too many requests")) {
+          // Rate limit: do NOT mark as enriched. Sleep and retry later.
+          console.log("[enrichment] Rate limit hit. Sleeping for 20 seconds before retry...");
+          await sleep(20000);
+          continue;
+        } else {
+          // Permanent failure: mark as enriched so we don't loop forever
+          await Job.updateOne(
+            { _id: job._id },
+            {
+              $set: {
+                isEnriched: true,
+              },
+            }
+          );
+          console.log(`[enrichment] Marked "${job.title}" as enriched with defaults due to non-retryable error.`);
+        }
       }
+
+      // 5 seconds delay between requests to stay safe under 15 RPM limit
+      await sleep(5000);
     }
-  } catch (error) {
-    console.error("runPendingAdzunaAnalysisWorker error:", error.message);
+  } catch (loopErr) {
+    console.error("[enrichment] Critical error in enrichment loop:", loopErr.message);
   } finally {
-    analysisWorkerRunning = false;
+    isEnriching = false;
   }
-  return { processed, skipped: 0 };
 };
 
-const queueAdzunaAnalysis = (batchSize) => {
-  setTimeout(() => {
-    runPendingAdzunaAnalysisWorker({ maxJobs: batchSize }).catch((err) => {
-      console.error("Background analysis error:", err.message);
-    });
-  }, 100);
-};
+/**
+ * Processes an array of normalized Apify items through the strict pipeline:
+ *   1. Title gate (intern / co-op / fellowship)
+ *   2. Deduplicate via externalId
+ *   3. Save to MongoDB as unenriched (asynchronous enrichment triggered afterwards)
+ *
+ * @param {Array} items - Normalized items from apifyService.
+ * @returns {Promise<{ fetched: number, filtered: number, saved: number }>}
+ */
+export const processApifyItems = async (items = []) => {
+  let filtered = 0;
+  let saved = 0;
 
-const fetchAdzunaPages = async ({
-  location = "",
-  role = "",
-  radius = "",
-  maxPages = ADZUNA_MAX_PAGES,
-} = {}) => {
-  if (!hasAdzunaConfig()) {
-    return [];
-  }
-
-  const { remoteOnly, distanceKm } = parseRadius(radius);
-  const normalizedRole = String(role || "").trim();
-  let normalizedLocation = remoteOnly ? "" : String(location || "").trim();
-  if (normalizedLocation) {
-    const parts = normalizedLocation.split(",");
-    normalizedLocation = parts[0].trim();
-  }
-  let whatValue = "internship";
-  if (normalizedRole) {
-    whatValue = normalizedRole;
-    if (remoteOnly) {
-      whatValue += " remote";
+  for (const item of items) {
+    // 1. Strict internship title gate
+    if (!passesInternshipGate(item.title)) {
+      filtered++;
+      continue;
     }
-  } else {
-    whatValue = remoteOnly ? "remote internship" : "internship";
-  }
 
-  const collected = [];
-
-  for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
-    const adzunaUrl = `${process.env.ADZUNA_BASE_URL}/${process.env.ADZUNA_COUNTRY}/search/${pageNumber}`;
-    console.log(`fetchAdzunaPages: Querying Adzuna URL: ${adzunaUrl} with params:`, {
-      what: whatValue,
-      where: normalizedLocation
-    });
-    const response = await axios.get(adzunaUrl, {
-      params: {
-        app_id: process.env.ADZUNA_APP_ID,
-        app_key: process.env.ADZUNA_APP_KEY,
-        results_per_page: ADZUNA_RESULTS_PER_PAGE,
-        what: whatValue,
-        where: normalizedLocation,
-        distance: distanceKm || undefined,
-      },
-      timeout: 10000,
-    });
-
-    const pageResults = Array.isArray(response.data?.results) ? response.data.results : [];
-    console.log(`fetchAdzunaPages: Adzuna API returned ${pageResults.length} results.`);
-    collected.push(...pageResults);
-
-    if (pageResults.length < ADZUNA_RESULTS_PER_PAGE) {
-      break;
+    // 1b. Location filter: restrict physical locations to India, and allow remote opportunities.
+    const itemLoc = String(item.location || "").toLowerCase();
+    const isRemote = itemLoc.includes("remote");
+    const isIndia = itemLoc.includes("india") || itemLoc.includes("bengaluru") || itemLoc.includes("bangalore") || itemLoc.includes("mumbai") || itemLoc.includes("delhi") || itemLoc.includes("pune") || itemLoc.includes("noida") || itemLoc.includes("hyderabad") || itemLoc.includes("chennai") || itemLoc.includes("gurgaon") || itemLoc.includes("kolkata");
+    const foreignCountries = ["united states", "usa", "united kingdom", "canada", "germany", "france", "australia", "singapore", "japan", "china", "europe", "london", "new york", "san francisco"];
+    let isForeign = foreignCountries.some(c => itemLoc.includes(c));
+    if (!isForeign) {
+      isForeign = /\buk\b/.test(itemLoc);
     }
-  }
 
-  return collected;
-};
+    if (isForeign && !isRemote) {
+      filtered++;
+      continue;
+    }
 
-// Ingestion Layer
-export const fetchAndEnrichJobs = async (req, res) => {
-  try {
-    // 1. Fetch from Adzuna automatically
-    const adzunaRawJobs = await fetchAdzunaPages({ maxPages: ADZUNA_MAX_PAGES });
-    const normalizedAdzunaJobs = adzunaRawJobs
-      .filter((job) => job?.id)
-      .map((job) => normalizeAdzunaJobForDb(job));
+    if (!isIndia && !isRemote) {
+      filtered++;
+      continue;
+    }
 
-    // 2. Fetch from JSearch automatically
-    const normalizedJSearchJobs = await fetchJSearchJobs("software engineer internship", 2);
-    const normalizedJobs = [...normalizedAdzunaJobs, ...normalizedJSearchJobs];
+    // 2. Deduplication — skip if externalId already exists
+    try {
+      const exists = await Job.findOne({
+        source: "apify",
+        externalId: item.externalId,
+      }).lean();
 
-    let newJobsCount = 0;
-
-    // 3. Process and enrich only new jobs
-    for (const normalizedJob of normalizedJobs) {
-      if (!normalizedJob?.externalId) {
-        continue;
-      }
-      if (!normalizedJob.applyUrl) {
-        continue;
-      }
-
-      const source = normalizedJob.source === "adzuna" ? "adzuna" : "local";
-      const externalId = String(normalizedJob.externalId);
-      const exists = await Job.findOne({ source, externalId }).lean();
       if (exists) {
         continue;
       }
-
-      let jobDoc = {
-        title: normalizedJob.title || "Internship Opportunity",
-        company: normalizedJob.company || "Unknown Company",
-        location: normalizedJob.location || "Remote",
-        description: normalizedJob.description || "No description provided.",
-        applyUrl: normalizedJob.applyUrl || "",
-        salary: normalizedJob.salary || "Not Disclosed",
-        source,
-        externalId,
-        isVerified: Boolean(normalizedJob.isVerified),
-        tags: Array.isArray(normalizedJob.tags) ? normalizedJob.tags : [],
-        coordinates: {
-          lat: Number.isFinite(Number(normalizedJob.coordinates?.lat))
-            ? Number(normalizedJob.coordinates.lat)
-            : null,
-          lng: Number.isFinite(Number(normalizedJob.coordinates?.lng))
-            ? Number(normalizedJob.coordinates.lng)
-            : null,
-        },
-        createdAt: normalizedJob.createdAt || new Date(),
-        redirectPenalty: Number.isFinite(normalizedJob.redirectPenalty)
-          ? normalizedJob.redirectPenalty
-          : 0,
-      };
-
-      // 4. AI enrichment
-      const aiData = await enrichJobWithAI(jobDoc.title, jobDoc.company, jobDoc.description);
-
-      if (aiData) {
-        jobDoc = { ...jobDoc, ...aiData, isEnriched: true };
-      }
-
-      await Job.create(jobDoc);
-      newJobsCount++;
+    } catch (lookupErr) {
+      console.error(
+        `[processApifyItems] Dedup lookup failed for ${item.externalId}:`,
+        lookupErr.message
+      );
+      continue;
     }
 
-    res.status(200).json({ message: "Ingestion and AI enrichment complete.", newJobsCount });
+    // 4. Create the job document (saved immediately as unenriched)
+    try {
+      await Job.create({
+        externalId: item.externalId,
+        title: item.title,
+        company: item.company,
+        location: item.location,
+        description: item.description,
+        applyUrl: item.applyUrl,
+        source: "apify",
+        isVerified: false,
+        isEnriched: false,
+        createdAt: item.createdAt || new Date(),
+      });
+      saved++;
+    } catch (createErr) {
+      // Duplicate key errors (E11000) are expected if a race condition hits
+      if (createErr.code !== 11000) {
+        console.error(
+          `[processApifyItems] Failed to save "${item.title}":`,
+          createErr.message
+        );
+      }
+    }
+  }
+
+  // Trigger background enrichment asynchronously (do not await)
+  if (saved > 0) {
+    triggerBackgroundEnrichment().catch((err) => {
+      console.error("[processApifyItems] Background enrichment trigger error:", err.message);
+    });
+  }
+
+  return { fetched: items.length, filtered, saved };
+};
+
+// ---------------------------------------------------------------------------
+// REST: POST /api/jobs/sync
+// Triggers an Apify scrape for a given role, processes results, returns stats.
+// ---------------------------------------------------------------------------
+
+export const syncApifyInternships = async (req, res) => {
+  try {
+    const role = String(
+      req.body?.role || req.query?.role || "Software Engineer Intern"
+    ).trim();
+    const location = String(
+      req.body?.location || req.query?.location || ""
+    ).trim();
+
+    let syncLocation = location;
+    if (syncLocation && syncLocation.toLowerCase() !== "remote" && !syncLocation.toLowerCase().includes("india")) {
+      syncLocation = `${syncLocation}, India`;
+    }
+
+    console.log(`[syncApifyInternships] Starting sync for role: "${role}", location: "${syncLocation}"`);
+
+    const items = await fetchApifyInternships(role, syncLocation);
+
+    if (items.length === 0) {
+      return res.json({
+        success: true,
+        message: "Apify returned 0 items for this query.",
+        stats: { fetched: 0, filtered: 0, saved: 0 },
+      });
+    }
+
+    const stats = await processApifyItems(items);
+
+    console.log(
+      `[syncApifyInternships] Complete — fetched: ${stats.fetched}, filtered: ${stats.filtered}, saved: ${stats.saved}`
+    );
+
+    return res.json({ success: true, stats });
   } catch (error) {
-    console.error("fetchAndEnrichJobs Error:", error.message);
-    res.status(500).json({ error: error.message });
+    console.error("[syncApifyInternships] Error:", error.message);
+    return res
+      .status(500)
+      .json({ error: "Failed to sync internships from Apify." });
   }
 };
+
+// ---------------------------------------------------------------------------
+// REST: GET /api/jobs
+// Paginated MongoDB query with AI-powered ranking. Falls back to live Apify
+// sync if a targeted search yields zero local results.
+// ---------------------------------------------------------------------------
 
 export const getJobs = async (req, res) => {
   try {
     const {
       page = 1,
-      limit = 20,
+      limit = 30,
       highQualityOnly = "false",
       role,
       category,
       location,
-      radius,
-      userSkills = [] // Can be passed from frontend user profile
+      userSkills = [],
     } = req.query;
 
     const matchStage = {};
+
     if (category && category !== "All") {
       matchStage.roleCategory = category;
     }
+
     if (role) {
       matchStage.$or = [
         { roleCategory: new RegExp(escapeRegex(role), "i") },
         { title: new RegExp(escapeRegex(role), "i") },
         { description: new RegExp(escapeRegex(role), "i") },
         { tags: new RegExp(escapeRegex(role), "i") },
-        { skills: new RegExp(escapeRegex(role), "i") }
+        { skills: new RegExp(escapeRegex(role), "i") },
       ];
     }
+
     if (location) {
-      const parts = location.split(",").map(p => p.trim()).filter(Boolean);
-      if (parts.length > 0) {
-        let locQuery = parts[0];
-        if (locQuery.toLowerCase().includes("delhi")) {
-          locQuery = "Delhi";
+      const normalizedLoc = location.toLowerCase().trim();
+      
+      if (normalizedLoc === "remote") {
+        matchStage.$or = [
+          { location: /remote/i },
+          { title: /remote/i }
+        ];
+      } else {
+        const searchConditions = [];
+        
+        // Smart synonym / typo tolerance mapping for major Indian hubs
+        if (
+          normalizedLoc.includes("delhi") ||
+          normalizedLoc.includes("deligi") ||
+          normalizedLoc.includes("dilli") ||
+          normalizedLoc.includes("ncr")
+        ) {
+          // Match Delhi, New Delhi, Delhi NCR, etc.
+          searchConditions.push({ location: /delhi/i }, { location: /ncr/i });
+        } else if (normalizedLoc.includes("mumbai") || normalizedLoc.includes("bombay")) {
+          searchConditions.push({ location: /mumbai|bombay/i });
+        } else if (normalizedLoc.includes("bengaluru") || normalizedLoc.includes("bangalore")) {
+          searchConditions.push({ location: /bengaluru|bangalore/i });
+        } else if (normalizedLoc.includes("kolkata") || normalizedLoc.includes("calcutta")) {
+          searchConditions.push({ location: /kolkata|calcutta/i });
+        } else if (normalizedLoc.includes("chennai") || normalizedLoc.includes("madras")) {
+          searchConditions.push({ location: /chennai|madras/i });
+        } else if (normalizedLoc.includes("gurgaon") || normalizedLoc.includes("gurugram")) {
+          searchConditions.push({ location: /gurgaon|gurugram|ncr/i });
+        } else if (normalizedLoc.includes("noida")) {
+          searchConditions.push({ location: /noida|ncr/i });
+        } else if (normalizedLoc.includes("hyderabad")) {
+          searchConditions.push({ location: /hyderabad/i });
+        } else if (normalizedLoc.includes("pune")) {
+          searchConditions.push({ location: /pune/i });
+        } else {
+          // Default: match city/state name (first part of split comma)
+          const parts = location
+            .split(",")
+            .map((p) => p.trim())
+            .filter(Boolean);
+          if (parts.length > 0) {
+            searchConditions.push({ location: new RegExp(escapeRegex(parts[0]), "i") });
+          }
         }
-        matchStage.location = new RegExp(escapeRegex(locQuery), "i");
+
+        matchStage.$and = [
+          { location: { $not: /remote/i } },
+          { title: { $not: /remote/i } },
+          ...(searchConditions.length > 0 ? [{ $or: searchConditions }] : [])
+        ];
       }
+    } else {
+      // Default: focus on physical India, exclude remote and foreign locations
+      matchStage.$and = [
+        { location: { $not: /remote/i } },
+        { title: { $not: /remote/i } },
+        { location: { $not: /united states|usa|united kingdom|uk|canada|germany|france|australia|singapore|japan|china/i } }
+      ];
     }
-    if (highQualityOnly === "true") matchStage.qualityScore = { $gte: 7 };
+
+    if (highQualityOnly === "true") {
+      matchStage.qualityScore = { $gte: 7 };
+    }
 
     const parsedUserSkills = Array.isArray(userSkills)
-      ? userSkills.map(s => String(s || "").trim().toLowerCase()).filter(Boolean)
-      : String(userSkills || "").split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      ? userSkills
+          .map((s) => String(s || "").trim().toLowerCase())
+          .filter(Boolean)
+      : String(userSkills || "")
+          .split(",")
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean);
 
     const pipeline = [
       { $match: matchStage },
@@ -373,70 +396,87 @@ export const getJobs = async (req, res) => {
                       {
                         $size: {
                           $setIntersection: [
-                            { $map: { input: "$skills", as: "s", in: { $toLower: "$$s" } } },
-                            parsedUserSkills
-                          ]
-                        }
+                            {
+                              $map: {
+                                input: "$skills",
+                                as: "s",
+                                in: { $toLower: "$$s" },
+                              },
+                            },
+                            parsedUserSkills,
+                          ],
+                        },
                       },
-                      { $size: "$skills" }
-                    ]
+                      { $size: "$skills" },
+                    ],
                   },
-                  100
-                ]
+                  100,
+                ],
               },
-              else: 0
-            }
+              else: 0,
+            },
           },
-          tierWeight: {
-            $switch: {
-              branches: [
-                { case: { $eq: ["$companyTier", "Tier1"] }, then: 10 },
-                { case: { $eq: ["$companyTier", "Tier2"] }, then: 6 },
-                { case: { $eq: ["$companyTier", "Startup"] }, then: 4 }
-              ],
-              default: 2
-            }
-          }
-        }
+        },
       },
       {
         $addFields: {
           finalScore: {
             $add: [
-              "$tierWeight",
               { $multiply: [{ $ifNull: ["$qualityScore", 5] }, 2] },
               { $divide: ["$skillMatchPercentage", 10] },
-              { $ifNull: ["$redirectPenalty", 0] }
-            ]
-          }
-        }
+              { $ifNull: ["$redirectPenalty", 0] },
+            ],
+          },
+        },
       },
       { $sort: { finalScore: -1, createdAt: -1 } },
       { $skip: (Number(page) - 1) * Number(limit) },
-      { $limit: Number(limit) }
+      { $limit: Number(limit) },
     ];
 
     let finalJobs = await Job.aggregate(pipeline);
     let finalTotal = await Job.countDocuments(matchStage);
 
-    if (finalJobs.length === 0 && (role || location) && hasAdzunaConfig()) {
-      try {
-        console.log(`No local results. Triggering live Adzuna sync for role: "${role}", location: "${location}"...`);
-        await runAdzunaSync({
-          force: true,
-          location: location || "",
-          role: role || "",
-          radius: radius || "",
-          maxPages: 2,
-        });
-        queueAdzunaAnalysis(5);
+    // -----------------------------------------------------------------------
+    // Live fallback: if a targeted search yields 0 results, trigger a fast
+    // real-time Apify sync for that exact query in the background.
+    // -----------------------------------------------------------------------
+    if (finalJobs.length === 0) {
+      const fallbackRole = role || category || "Software Engineer";
+      const fallbackLocation = location || "India";
+      const fallbackQuery = `${fallbackRole} ${fallbackLocation} Intern`;
+      console.log(
+        `[getJobs] 0 local results. Triggering async live fallback sync for: "${fallbackQuery}"`
+      );
 
-        // Re-query the database
-        finalJobs = await Job.aggregate(pipeline);
-        finalTotal = await Job.countDocuments(matchStage);
-      } catch (syncErr) {
-        console.error("Auto-sync on search failed:", syncErr.message);
-      }
+      // Trigger the sync asynchronously in the background so the current request
+      // does not wait (takes 1-3 mins) and time out.
+      fetchApifyInternships(fallbackRole, fallbackLocation)
+        .then((items) => {
+          if (items.length > 0) {
+            return processApifyItems(items);
+          }
+        })
+        .then((stats) => {
+          if (stats) {
+            console.log(
+              `[getJobs] Async fallback complete — fetched: ${stats.fetched}, filtered: ${stats.filtered}, saved: ${stats.saved}`
+            );
+          }
+        })
+        .catch((syncErr) => {
+          console.error("[getJobs] Async fallback sync failed:", syncErr.message);
+        });
+
+      return res.json({
+        jobs: [],
+        total: 0,
+        page: Number(page),
+        limit: Number(limit),
+        syncing: true,
+        source: "mongodb/ai-ranked",
+        message: "Searching LinkedIn Live... We are fetching fresh internships for this query in the background. Please refresh in a moment!",
+      });
     }
 
     return res.json({
@@ -444,13 +484,18 @@ export const getJobs = async (req, res) => {
       total: finalTotal,
       page: Number(page),
       limit: Number(limit),
-      source: "mongodb/ai-ranked"
+      source: "mongodb/ai-ranked",
     });
   } catch (error) {
-    console.error("getJobs error:", error.message);
+    console.error("[getJobs] Error:", error.message);
     return res.status(500).json({ error: "Failed to fetch jobs." });
   }
 };
+
+// ---------------------------------------------------------------------------
+// REST: GET /api/jobs/:id
+// Fetches a single job by MongoDB ObjectId or externalId.
+// ---------------------------------------------------------------------------
 
 export const getJobById = async (req, res) => {
   try {
@@ -462,16 +507,7 @@ export const getJobById = async (req, res) => {
     }
 
     if (!job) {
-      job = await Job.findOne({ source: "adzuna", externalId: String(id) }).lean();
-    }
-
-    if (!job && hasAdzunaConfig()) {
-      const adzunaJobs = await fetchAdzunaPages({ maxPages: ADZUNA_MAX_PAGES });
-      const match = adzunaJobs.find((item) => String(item.id) === String(id));
-      if (match) {
-        await upsertAdzunaJobs([match]);
-        job = await Job.findOne({ source: "adzuna", externalId: String(id) }).lean();
-      }
+      job = await Job.findOne({ source: "apify", externalId: String(id) }).lean();
     }
 
     if (!job) {
@@ -483,70 +519,45 @@ export const getJobById = async (req, res) => {
       return res.status(404).json({ error: "Job not found." });
     }
 
-    if (job.source === "adzuna" && !job.aiAnalysis) {
-      queueAdzunaAnalysis(1);
+    const jobData = filtered[0];
+
+    // Ensure aiAnalysis structure is populated correctly for the frontend
+    if (!jobData.aiAnalysis) {
+      jobData.aiAnalysis = {
+        authenticityScore: jobData.authenticityScore || 50,
+        fitScore: jobData.fitScore || 50,
+        confidence: jobData.confidence || 0.5,
+        summary: jobData.summary || "",
+        redFlags: jobData.redFlags || [],
+        strengths: jobData.strengths || [],
+        interviewQuestions: jobData.interviewQuestions || [],
+        extractedSkills: jobData.skills || []
+      };
     }
 
-    return res.json({ job: filtered[0] });
+    // Tailor mock interview questions dynamically using Groq if authenticated student is requesting
+    if (req.user) {
+      try {
+        console.log(`[getJobById] Generating candidate-tailored mock interview questions using Groq...`);
+        const tailoredQuestions = await generateMockInterviewQuestions(req.user, jobData);
+        jobData.aiAnalysis.interviewQuestions = tailoredQuestions;
+        jobData.interviewQuestions = tailoredQuestions;
+      } catch (groqErr) {
+        console.error("[getJobById] Groq interview questions generation failed:", groqErr.message);
+      }
+    }
+
+    return res.json({ job: jobData });
   } catch (error) {
-    console.error("getJobById error:", error.message);
+    console.error("[getJobById] Error:", error.message);
     return res.status(500).json({ error: "Failed to fetch job." });
   }
 };
 
-export const syncAdzunaJobs = async (req, res) => {
-  try {
-    if (!hasAdzunaConfig()) {
-      return res.status(400).json({ error: "Adzuna is not configured." });
-    }
-
-    const pages = clamp(parsePositiveInt(req.body?.pages || req.query?.pages, ADZUNA_MAX_PAGES), 1, 10);
-    const location = String(req.body?.location || req.query?.location || "").trim();
-    const role = String(req.body?.role || req.query?.role || "").trim();
-    const radius = String(req.body?.radius || req.query?.radius || "").trim().toLowerCase();
-
-    const stats = await runAdzunaSync({
-      force: true,
-      location,
-      role,
-      radius,
-      maxPages: pages,
-    });
-
-    queueAdzunaAnalysis(GEMINI_ANALYSIS_BATCH_SIZE);
-
-    return res.json({
-      success: true,
-      stats: stats || { fetched: 0, upserted: 0, modified: 0, matched: 0, pages },
-      analyzedInBackground: true,
-      geminiDelayMs: GEMINI_ANALYSIS_DELAY_MS,
-    });
-  } catch (error) {
-    console.error("syncAdzunaJobs error:", error.message);
-    return res.status(500).json({ error: "Failed to sync Adzuna internships." });
-  }
-};
-
-export const analyzePendingAdzunaJobs = async (req, res) => {
-  try {
-    const requestedBatch = clamp(
-      parsePositiveInt(req.body?.batchSize || req.query?.batchSize, GEMINI_ANALYSIS_BATCH_SIZE),
-      1,
-      5
-    );
-    const result = await runPendingAdzunaAnalysisWorker({ maxJobs: requestedBatch });
-
-    return res.json({
-      success: true,
-      processed: result.processed,
-      skipped: result.skipped,
-      geminiDelayMs: GEMINI_ANALYSIS_DELAY_MS,
-    });
-  } catch (error) {
-    console.error("analyzePendingAdzunaJobs error:", error.message);
-    return res.status(500).json({ error: "Failed to analyze pending Adzuna jobs." });
-  }
-};
+// ---------------------------------------------------------------------------
+// REST: POST /api/jobs
+// Manual admin job creation with Gemini analysis.
+// ---------------------------------------------------------------------------
 
 export const createJob = async (req, res) => {
   try {
@@ -560,7 +571,6 @@ export const createJob = async (req, res) => {
       tags = [],
       source = "local",
       isVerified = false,
-      externalId = null,
       coordinates = {},
     } = req.body;
 
@@ -576,13 +586,16 @@ export const createJob = async (req, res) => {
       applyUrl,
       salary,
       tags: Array.isArray(tags) ? tags : [],
-      source: source === "adzuna" ? "adzuna" : "local",
-      externalId: source === "adzuna" ? String(externalId || "") || null : null,
+      source: "local",
       isVerified: Boolean(isVerified),
       postedBy: req.user._id,
       coordinates: {
-        lat: Number.isFinite(Number(coordinates.lat)) ? Number(coordinates.lat) : null,
-        lng: Number.isFinite(Number(coordinates.lng)) ? Number(coordinates.lng) : null,
+        lat: Number.isFinite(Number(coordinates.lat))
+          ? Number(coordinates.lat)
+          : null,
+        lng: Number.isFinite(Number(coordinates.lng))
+          ? Number(coordinates.lng)
+          : null,
       },
     };
 
@@ -594,7 +607,7 @@ export const createJob = async (req, res) => {
 
     return res.status(201).json({ job: created });
   } catch (error) {
-    console.error("createJob error:", error.message);
+    console.error("[createJob] Error:", error.message);
     return res.status(500).json({ error: "Failed to create job." });
   }
 };

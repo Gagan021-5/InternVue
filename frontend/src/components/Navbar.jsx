@@ -202,8 +202,8 @@ export default function Navbar({ onSearch }) {
                       {/* Menu items */}
                       <div className="p-2">
                         {[
-                          { to: "/dashboard", label: "Dashboard", icon: "⚡" },
-                          { to: "/feed", label: "Browse Jobs", icon: "🔍" },
+                          { to: "/dashboard", label: "Dashboard" },
+                          { to: "/feed", label: "Browse Jobs" },
                         ].map((item) => (
                           <Link
                             key={item.to}
@@ -211,7 +211,6 @@ export default function Navbar({ onSearch }) {
                             onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5"
                           >
-                            <span className="text-base">{item.icon}</span>
                             {item.label}
                           </Link>
                         ))}
@@ -223,7 +222,6 @@ export default function Navbar({ onSearch }) {
                           onClick={handleLogout}
                           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-500 transition-all hover:bg-red-50 dark:hover:bg-red-500/10"
                         >
-                          <span className="text-base">↩</span>
                           Sign Out
                         </button>
                       </div>
@@ -256,17 +254,6 @@ export default function Navbar({ onSearch }) {
             </button>
           </div>
         </div>
-
-        {/* ── SearchBar (Feed page only) ──────────────────────────────── */}
-        {onSearch && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4"
-          >
-            <SearchBar onSearch={onSearch} />
-          </motion.div>
-        )}
 
         {/* ── Mobile Drawer ───────────────────────────────────────────── */}
         <AnimatePresence>

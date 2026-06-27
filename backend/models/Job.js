@@ -10,7 +10,7 @@ const jobSchema = new mongoose.Schema({
   applyUrl: { type: String, required: true, trim: true },
   salary: { type: String, default: "Not Disclosed" },
   tags: { type: [String], default: [] },
-  source: { type: String, enum: ["local", "adzuna"], default: "local" },
+  source: { type: String, enum: ["local", "apify"], default: "local" },
   externalId: { type: String, trim: true, default: null },
   isVerified: { type: Boolean, default: false },
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -25,13 +25,16 @@ const jobSchema = new mongoose.Schema({
     default: "Other"
   },
   seniorityLevel: { type: String, default: "Internship" },
-  companyTier: {
-    type: String,
-    enum: ["Tier1", "Tier2", "Startup", "Unknown"],
-    default: "Unknown"
-  },
   qualityScore: { type: Number, min: 1, max: 10, default: 5 },
   skills: [{ type: String }],
+  authenticityScore: { type: Number, default: 50 },
+  fitScore: { type: Number, default: 50 },
+  confidence: { type: Number, default: 0.5 },
+  summary: { type: String, default: "" },
+  redFlags: { type: [String], default: [] },
+  strengths: { type: [String], default: [] },
+  interviewQuestions: { type: [String], default: [] },
+  aiAnalysis: { type: mongoose.Schema.Types.Mixed, default: null },
 
   // Dynamic Ranking 
   redirectPenalty: { type: Number, default: 0 },
@@ -41,7 +44,7 @@ const jobSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-jobSchema.index({ companyTier: 1, qualityScore: -1 });
+jobSchema.index({ qualityScore: -1 });
 jobSchema.index({ roleCategory: 1, location: 1 });
 jobSchema.index({ title: "text", company: "text", skills: "text", location: "text" });
 jobSchema.index(
@@ -49,7 +52,7 @@ jobSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      source: "adzuna",
+      source: "apify",
       externalId: { $type: "string" },
     },
   }

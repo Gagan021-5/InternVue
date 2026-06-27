@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Navbar from "../components/Navbar";
-import FilterPanel from "../components/FilterPanel";
+import SearchBar from "../components/SearchBar";
 import InternshipCard from "../components/InternshipCard";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import useJobs from "../hooks/useJobs";
@@ -10,26 +10,10 @@ import { useAuthContext } from "../context/AuthContext";
 
 const JOB_CATEGORIES = [
   "All",
-  "Full-Stack (MERN)",
-  "AI/ML (Numpy/Pandas)",
-  "Python",
+  "Software Engineer",
   "Frontend",
   "Backend",
-  "HR",
-  "Marketing",
-  "Sales",
-  "Finance",
-  "Content",
-  "Design",
-  "Web3",
 ];
-
-const categoryTermsMap = {
-  "Full-Stack (MERN)": ["full-stack", "full stack", "mern", "react", "node", "express", "mongodb"],
-  "AI/ML (Numpy/Pandas)": ["ai", "ml", "machine learning", "artificial intelligence", "numpy", "pandas", "data science"],
-  Frontend: ["frontend", "front-end", "react", "vue", "angular", "ui"],
-  Backend: ["backend", "back-end", "node", "express", "django", "spring", "api"],
-};
 
 export default function FeedPage() {
   const [location, setLocation] = useState("");
@@ -37,10 +21,10 @@ export default function FeedPage() {
   const [radius, setRadius] = useState("");
   const [page, setPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState("All");
-  const pageSize = 20;
+  const pageSize = 30;
 
   const [filters, setFilters] = useState({
-    sources: { local: true, adzuna: true },
+    sources: { local: true, apify: true },
     verifiedOnly: false,
     tags: [],
   });
@@ -52,16 +36,9 @@ export default function FeedPage() {
     let r = role;
     
     const categoryMapping = {
-      "Full-Stack (MERN)": "Full Stack",
-      "AI/ML (Numpy/Pandas)": "AI/ML",
+      "Software Engineer": "SDE",
       "Frontend": "Frontend",
       "Backend": "Backend",
-      "HR": "HR",
-      "Marketing": "Marketing",
-      "Sales": "Sales",
-      "Finance": "Finance",
-      "Content": "Content",
-      "Design": "Design",
     };
 
     if (categoryMapping[activeCategory]) {
@@ -74,7 +51,7 @@ export default function FeedPage() {
     return { backendCategory: cat, backendRole: r };
   }, [activeCategory, role]);
 
-  const { jobs, loading, error, totalJobs } = useJobs({
+  const { jobs, loading, error, totalJobs, syncing, syncMessage } = useJobs({
     location,
     role: backendRole,
     category: backendCategory,
@@ -100,7 +77,7 @@ export default function FeedPage() {
 
   const visibleJobs = useMemo(() => {
     return jobs.filter((job) => {
-      const sourceOk = (job.source === "local" && filters.sources.local) || (job.source === "adzuna" && filters.sources.adzuna);
+      const sourceOk = (job.source === "local" && filters.sources.local) || (job.source === "apify" && filters.sources.apify);
       if (!sourceOk) return false;
       if (filters.verifiedOnly && !job.isVerified) return false;
 
@@ -126,21 +103,18 @@ export default function FeedPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 transition-colors duration-500 dark:bg-[#030712]">
-      <Navbar
-        onSearch={(nextLocation, nextRole, nextRadius) => {
-          setLocation(nextLocation); setRole(nextRole); setRadius(nextRadius); setPage(1);
-        }}
-      />
+      <Navbar />
 
-      {/* Subtle Background Mesh */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-0 dark:opacity-20">
-        <div className="absolute -left-[10%] -top-[10%] h-[50%] w-[50%] rounded-full bg-blue-600/20 blur-[150px]" />
-      </div>
-
-      <div className="relative mx-auto max-w-[1600px] px-6 py-8 lg:px-10 lg:py-12">
+      <div className="relative mx-auto max-w-[1600px] px-6 py-8 lg:px-10 lg:py-12 space-y-8">
         
+        <SearchBar
+          onSearch={(nextLocation, nextRole, nextRadius) => {
+            setLocation(nextLocation); setRole(nextRole); setRadius(nextRadius); setPage(1);
+          }}
+        />
+
         {/* UNCLUTTERED HEADER */}
-        <header className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pt-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white md:text-4xl">
               Discover Internships
@@ -180,21 +154,23 @@ export default function FeedPage() {
         </div>
 
         {/* MAIN LAYOUT */}
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[280px_1fr]">
-          
-          {/* SIDEBAR */}
-          <aside className="no-scrollbar overflow-y-auto lg:sticky lg:top-28 lg:h-[calc(100vh-120px)]">
-            {/* Removed the extra border/bg wrapper to let the FilterPanel breathe */}
-            <div className="pr-4">
-              <FilterPanel onFilterChange={setFilters} />
-            </div>
-          </aside>
-
+        {/* MAIN LAYOUT */}
+        <div className="w-full">
           {/* GRID SECTION */}
           <section className="space-y-6">
             {error && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
                 {error}
+              </motion.div>
+            )}
+
+            {syncing && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-3xl border border-blue-200 bg-blue-50/50 p-5 text-sm text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 backdrop-blur-md flex items-center gap-3">
+                <span className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full shrink-0" />
+                <div>
+                  <h4 className="font-bold">Searching LinkedIn Live...</h4>
+                  <p className="mt-1 text-xs opacity-90">{syncMessage}</p>
+                </div>
               </motion.div>
             )}
 
@@ -228,8 +204,10 @@ export default function FeedPage() {
             {/* EMPTY STATE */}
             {!loading && visibleJobs.length === 0 && (
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="mb-4 rounded-full bg-slate-100 p-4 dark:bg-white/5">
-                  <span className="text-2xl">🔍</span>
+                <div className="mb-4 rounded-full bg-slate-100 p-4 dark:bg-white/5 text-slate-400 dark:text-slate-500">
+                  <svg className="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">No matches found</h3>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">

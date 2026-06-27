@@ -33,7 +33,7 @@ const upsertFirebaseUser = async ({
           authProviders: provider,
         },
       },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     );
   } catch (error) {
     // Resolve duplicate-email collisions by linking the existing profile to this Firebase UID.
@@ -120,21 +120,19 @@ export const getMe = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { githubUrl, portfolioUrl, resumeUrl, bio, skills, location } = req.body;
+    const { resumeUrl, bio, skills, location } = req.body;
 
     const updated = await User.findByIdAndUpdate(
       req.user._id,
       {
         $set: {
-          githubUrl: typeof githubUrl === "string" ? githubUrl : req.user.githubUrl,
-          portfolioUrl: typeof portfolioUrl === "string" ? portfolioUrl : req.user.portfolioUrl,
           resumeUrl: typeof resumeUrl === "string" ? resumeUrl : req.user.resumeUrl,
           bio: typeof bio === "string" ? bio : req.user.bio,
           skills: Array.isArray(skills) ? skills : req.user.skills,
           location: typeof location === "object" && location ? location : req.user.location,
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     return res.json({ user: updated });

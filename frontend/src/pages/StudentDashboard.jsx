@@ -1,17 +1,49 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion"; // Make sure this is installed
 import Navbar from "../components/Navbar";
-import VoiceMentorButton from "../components/VoiceMentorButton";
 import OutreachModal from "../components/OutreachModal";
 import { useAuthContext } from "../context/AuthContext";
 import axiosInstance from "../api/axiosInstance";
 
 const tabs = [
-  { id: "profile", label: "Career Identity", icon: "👤" },
-  { id: "saved", label: "Saved Opportunities", icon: "🔖" },
-  { id: "prep", label: "AI Interview Prep", icon: "🧠" },
-  { id: "tracker", label: "Pipeline Tracker", icon: "📈" },
+  { id: "profile", label: "Career Identity", icon: "profile" },
+  { id: "saved", label: "Saved Opportunities", icon: "saved" },
+  { id: "prep", label: "Interview Prep Co-Pilot", icon: "prep" },
+  { id: "tracker", label: "Pipeline Tracker", icon: "tracker" },
 ];
+
+const renderTabIcon = (iconName) => {
+  const baseClass = "h-4 w-4 shrink-0";
+  if (iconName === "profile") {
+    return (
+      <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    );
+  }
+  if (iconName === "saved") {
+    return (
+      <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+      </svg>
+    );
+  }
+  if (iconName === "prep") {
+    return (
+      <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    );
+  }
+  if (iconName === "tracker") {
+    return (
+      <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    );
+  }
+  return null;
+};
 
 const statusOrder = ["saved", "applied", "interviewing", "accepted", "rejected"];
 
@@ -34,9 +66,49 @@ export default function StudentDashboard() {
   const [outreachModalJob, setOutreachModalJob] = useState(null);
 
   const [form, setForm] = useState({
-    githubUrl: "", portfolioUrl: "", resumeUrl: "", bio: "", skills: [],
+    resumeUrl: "", bio: "", skills: [],
     location: { city: "", state: "", country: "" },
   });
+
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      setUploadError("Please upload a valid PDF resume document.");
+      return;
+    }
+
+    setUploadingResume(true);
+    setUploadError("");
+    setUploadSuccess(false);
+
+    const formData = new FormData();
+    formData.append("resume", file);
+
+    try {
+      const response = await axiosInstance.post("/api/user/jobs/upload-resume", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setUploadSuccess(true);
+      if (response.data?.user?.resumeUrl) {
+        setForm((prev) => ({ ...prev, resumeUrl: response.data.user.resumeUrl }));
+      }
+      await refreshProfile();
+    } catch (err) {
+      console.error("Resume upload failed:", err.message);
+      setUploadError(err.response?.data?.error || "Failed to upload and parse resume PDF.");
+    } finally {
+      setUploadingResume(false);
+    }
+  };
 
   // Keep your existing data loading logic untouched
   const loadDashboardData = async () => {
@@ -49,7 +121,7 @@ export default function StudentDashboard() {
       const p = meRes.data?.user;
       setSavedJobs(savedRes.data?.jobs || []);
       setForm({
-        githubUrl: p?.githubUrl || "", portfolioUrl: p?.portfolioUrl || "", resumeUrl: p?.resumeUrl || "",
+        resumeUrl: p?.resumeUrl || "",
         bio: p?.bio || "", skills: Array.isArray(p?.skills) ? p.skills : [],
         location: { city: p?.location?.city || "", state: p?.location?.state || "", country: p?.location?.country || "" },
       });
@@ -143,10 +215,7 @@ export default function StudentDashboard() {
     <main className="min-h-screen bg-slate-50 dark:bg-[#030712] transition-colors duration-500">
       <Navbar />
 
-      {/* Background Mesh (Invisible in light mode, soft glow in dark mode) */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-0 dark:opacity-40">
-        <div className="absolute -top-[10%] -right-[10%] h-[50%] w-[50%] rounded-full bg-blue-600/20 blur-[120px]" />
-      </div>
+
 
       <div className="relative mx-auto max-w-7xl px-4 py-8 lg:px-8">
 
@@ -175,9 +244,7 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            <div className="shrink-0">
-              <VoiceMentorButton />
-            </div>
+
           </div>
         </section>
 
@@ -187,12 +254,13 @@ export default function StudentDashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex shrink-0 items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${activeTab === tab.id
+              className={`flex shrink-0 items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${activeTab === tab.id
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
                 : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10"
                 }`}
             >
-              <span>{tab.icon}</span> {tab.label}
+              {renderTabIcon(tab.icon)}
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
@@ -210,18 +278,44 @@ export default function StudentDashboard() {
           {activeTab === "profile" && (
             <motion.section key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid gap-6 lg:grid-cols-3">
               <div className="rounded-[2rem] border border-slate-200 bg-white/60 p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/5 lg:col-span-2">
-                <h2 className="mb-6 text-xl font-bold text-slate-900 dark:text-white">Professional Links</h2>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <input value={form.githubUrl} onChange={(e) => setForm({ ...form, githubUrl: e.target.value })} placeholder="GitHub URL" className={inputClass} />
-                  <input value={form.portfolioUrl} onChange={(e) => setForm({ ...form, portfolioUrl: e.target.value })} placeholder="Portfolio URL" className={inputClass} />
-                  <input value={form.resumeUrl} onChange={(e) => setForm({ ...form, resumeUrl: e.target.value })} placeholder="Resume Link (PDF)" className={`md:col-span-2 ${inputClass}`} />
+                <h2 className="mb-6 text-xl font-bold text-slate-900 dark:text-white">Professional Documents</h2>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Resume Document (PDF)</label>
+                    <div className="flex items-center gap-4">
+                      <label className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2.5 px-6 rounded-2xl transition duration-200 shadow-md">
+                        {uploadingResume ? "Parsing..." : "Upload PDF"}
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={handleResumeUpload}
+                          className="hidden"
+                          disabled={uploadingResume}
+                        />
+                      </label>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {uploadingResume ? "Our AI is reading the resume text..." : form.resumeUrl ? "✓ Resume attached" : "Attach resume up to 5MB"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {uploadSuccess && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      ✓ Resume uploaded and analyzed successfully!
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+                      ✗ {uploadError}
+                    </div>
+                  )}
                 </div>
 
                 <h2 className="mb-4 mt-8 text-xl font-bold text-slate-900 dark:text-white">Location Details</h2>
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2">
                   <input value={form.location.city} onChange={(e) => setForm({ ...form, location: { ...form.location, city: e.target.value } })} placeholder="City" className={inputClass} />
                   <input value={form.location.state} onChange={(e) => setForm({ ...form, location: { ...form.location, state: e.target.value } })} placeholder="State" className={inputClass} />
-                  <input value={form.location.country} onChange={(e) => setForm({ ...form, location: { ...form.location, country: e.target.value } })} placeholder="Country" className={inputClass} />
                 </div>
 
                 <h2 className="mb-4 mt-8 text-xl font-bold text-slate-900 dark:text-white">About Me</h2>
@@ -273,7 +367,7 @@ export default function StudentDashboard() {
                       <select value={entry.status} onChange={(e) => updateStatus(entry.jobId, e.target.value)} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 outline-none dark:border-white/10 dark:bg-black/20 dark:text-slate-300">
                         {statusOrder.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                       </select>
-                      <button onClick={() => setOutreachModalJob(entry)} className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20">✨ Draft</button>
+                      <button onClick={() => setOutreachModalJob(entry)} className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20">Draft</button>
                       <button onClick={() => unsave(entry.jobId)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20">Remove</button>
                     </div>
                   </div>
@@ -287,7 +381,7 @@ export default function StudentDashboard() {
             <motion.section key="prep" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
               {groupedQuestions.length === 0 ? (
                 <div className="rounded-[2rem] border border-dashed border-slate-300 py-20 text-center dark:border-white/10">
-                  <p className="text-slate-500 dark:text-slate-400">Save jobs from the Smart Feed to generate AI interview questions.</p>
+                  <p className="text-slate-500 dark:text-slate-400">Save jobs from the Smart Feed to generate custom interview questions.</p>
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2">
@@ -331,7 +425,7 @@ export default function StudentDashboard() {
                           <p className="mt-1 text-xs text-slate-500 line-clamp-1 dark:text-slate-400">{entry.jobData?.company}</p>
                           <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-white/5">
                             <span className="text-[10px] font-semibold text-slate-400">Saved {new Date(entry.savedAt).toLocaleDateString()}</span>
-                            <span className="text-[10px] font-mono text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-600">Drag ⠿</span>
+                            <span className="text-[10px] font-mono text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-600">Drag</span>
                           </div>
                         </motion.div>
                       ))}

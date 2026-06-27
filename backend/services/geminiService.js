@@ -67,8 +67,8 @@ export const analyzeJobWithGemini = async (job) => {
   const analysisPromise = analysisQueue.then(async () => {
     try {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      // Forced to gemini-1.5-flash to fix v1beta endpoint 404 errors
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      // Updated to gemini-3.1-flash-lite to prevent free-tier 20/day quota limits & 404/503 errors
+      const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
       const prompt = `
 You are evaluating internship authenticity and student fit.
 Return ONLY valid JSON with keys:
@@ -117,9 +117,9 @@ export const generateOutreachEmail = async (user, job) => {
     throw new Error("Gemini API Key is not configured.");
   }
 
-  // Use the specific 2.5-flash model as requested by the user
+  // Use gemini-3.1-flash-lite to prevent free-tier 20/day quota limits & 404/503 errors
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
 
   const prompt = `
 You are an expert career coach. Write a concise, highly professional cold outreach email (max 3 short paragraphs) for the student to send to a hiring manager. 
@@ -142,5 +142,85 @@ Description: ${job.description}
   } catch (error) {
     console.error("Gemini outreach generation error:", error.message);
     throw new Error("Failed to generate outreach email with AI.");
+  }
+};
+
+export const generateJobAssistantReply = async (user, job, messages) => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("Gemini API Key is not configured.");
+  }
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
+
+  const conversation = messages
+    .map((message) => {
+      const role = message.role === "assistant" ? "Assistant" : "User";
+      return `${role}: ${message.content}`;
+    })
+    .join("\n");
+
+  const prompt = `
+You are an expert internship career assistant for a student applying to a Backend Developer Internship. Answer questions about the role, the job requirements, the student's fit, and provide recruiter-ready outreach suggestions when requested.
+
+Student Profile:
+Name: ${user.displayName || "Student"}
+Bio: ${user.bio || "No bio provided."}
+Skills: ${(user.skills || []).join(", ") || "General software development skills"}
+
+Job Details:
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location}
+Description: ${job.description}
+
+Conversation:
+${conversation}
+Assistant:`;
+
+  try {
+    const response = await model.generateContent(prompt);
+    return response.response.text().trim();
+  } catch (error) {
+    console.error("Gemini job chat generation error:", error.message);
+    throw new Error("Failed to generate job chat response with AI.");
+  }
+};
+
+/**
+ * Extracts raw text content from a resume PDF buffer using Gemini.
+ *
+ * @param {Buffer} pdfBuffer - Uploaded file buffer.
+ * @returns {Promise<string>} Plain text extraction of the resume.
+ */
+export const extractResumeTextWithGemini = async (pdfBuffer) => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is not configured.");
+  }
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  // Use gemini-2.5-flash as requested
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `You are a professional resume parser.
+Extract and output the full plain text contents of this resume document.
+Include all key details, sections (Skills, Projects, Education, Experience), contact details, and summaries.
+Do not format as JSON or add markdown comments, just return the raw plain text.`;
+
+  try {
+    const response = await model.generateContent([
+      {
+        inlineData: {
+          data: pdfBuffer.toString("base64"),
+          mimeType: "application/pdf",
+        },
+      },
+      prompt,
+    ]);
+
+    return response.response.text().trim();
+  } catch (error) {
+    console.error("[geminiService] Resume PDF extraction failed:", error.message);
+    throw new Error("Failed to parse resume PDF with Gemini.");
   }
 };

@@ -6,9 +6,8 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   photoURL: { type: String, default: "" },
   role: { type: String, enum: ["student", "admin"], default: "student" },
-  githubUrl: { type: String, default: "" },
-  portfolioUrl: { type: String, default: "" },
   resumeUrl: { type: String, default: "" },
+  extractedResumeText: { type: String, default: "" },
   bio: { type: String, default: "" },
   skills: { type: [String], default: [] },
   location: {

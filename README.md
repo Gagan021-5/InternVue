@@ -11,7 +11,7 @@
   <p align="center">
     <strong>A Premium Next-Generation Internship Portal Built with the MERN Stack.</strong>
     <br />
-    Leveraging the power of Google Gemini AI, Firebase, and real-time job aggregation to help students land their dream careers.
+    Leveraging the power of Groq LLM, Murf TTS, Firebase, and real-time job aggregation to help students land their dream careers.
   </p>
 
   <p align="center">
@@ -36,10 +36,10 @@
 
 - 🎨 **Premium UI/UX:** Built with Tailwind CSS, Framer Motion, and Glassmorphism design principles. Includes full Dark/Light mode support with persistence.
 - 🔐 **Robust Authentication:** Secure JWT-based email/password registration alongside Social OAuth (Google, GitHub) handled via Firebase and synced to MongoDB.
-- ⚡ **Automated Job Ingestion:** Integrates with Adzuna and JSearch APIs to aggregate thousands of global internships without manual cron scripting.
-- 🧠 **Dynamic AI Matching Engine:** Employs Google's Gemini 1.5 Flash to automatically enrich job postings (Company Tiers, Skill Extraction) and uses a MongoDB Aggregation Pipeline to score and rank jobs dynamically against user profiles.
-- 🎙️ **Streaming AI Mentor Voice:** Integrates the ElevenLabs Text-to-Speech API to convert AI-generated career advice directly into a streaming audio response.
-- ✨ **AI Cover Letter & Outreach:** Instantly generates highly professional, personalized cold outreach emails tailored to the student's profile and the specific job description using Gemini 2.5 Flash.
+- ⚡ **Automated Job Ingestion:** Uses Apify and background workers to aggregate internships and job postings from multiple public sources, normalize listings, and store them in MongoDB for efficient querying.
+- 🧠 **Dynamic AI Matching Engine:** Uses a Groq-based prompt pipeline to enrich job postings (skill extraction, company signals) and a MongoDB aggregation pipeline to score and rank jobs against user profiles.
+- 🎙️ **Interview-Ready Voice Mentor:** Uses Murf TTS for high-quality audio generation of mock interview questions and mentor replies.
+- ✨ **AI Cover Letter & Outreach:** Generates personalized outreach emails and cover letters tailored to a student's profile and job description using Groq LLM.
 - 📊 **Kanban Pipeline Tracker:** A beautifully interactive, drag-and-drop Kanban board enabling students to track application statuses (`Saved`, `Applied`, `Interviewing`, `Accepted`).
 - 📍 **Location-Aware Filtering:** Browser Geolocation API integration automatically detects city/state for hyper-local internship results.
 
@@ -55,8 +55,8 @@
 - **Runtime:** Node.js
 - **Framework:** Express.js
 - **Database:** MongoDB (Mongoose ORM with advanced Aggregation Pipelines)
-- **AI Integration:** `@google/generative-ai` (Gemini 1.5 & 2.5 Flash instances)
-- **Voice Integration:** ElevenLabs TTS API
+- **AI Integration:** Groq LLM (server-side prompt orchestration)
+- **Voice Integration:** Murf TTS (server-side synthesis for mock interviews)
 - **Authentication:** Firebase Admin SDK (JWT Validation)
 
 ## 🚀 Quick Start
@@ -109,15 +109,12 @@ To fully run this project, you will need to set up `.env` files in both the `fro
 ### Backend (`/backend/.env`)
 ```env
 PORT=5000
-MONGODB_URI=your_mongodb_connection_string
-FIREBASE_PROJECT_ID=your_firebase_project_id
-FIREBASE_CLIENT_EMAIL=your_firebase_client_email
-FIREBASE_PRIVATE_KEY="your_firebase_private_key"
-GEMINI_API_KEY=your_google_gemini_api_key
-ADZUNA_APP_ID=your_adzuna_app_id
-ADZUNA_APP_KEY=your_adzuna_app_key
-JSEARCH_API_KEY=your_rapidapi_jsearch_key
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
+MONGO_URI=your_mongodb_connection_string
+# Firebase service account (JSON or individual env vars)
+FIREBASE_CREDENTIALS_JSON='{"type":"service_account", ... }'
+GROQ_API_KEY=your_groq_api_key
+MURF_API_KEY=your_murf_api_key
+APIFY_TOKEN=your_apify_actor_token
 ```
 
 ### Frontend (`/frontend/.env`)
